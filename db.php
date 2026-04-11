@@ -1,10 +1,7 @@
 <?php
 ob_start();
 
-define('DB_HOST', 'localhost');
-define('DB_USER', 'root');
-define('DB_PASS', 'usbw');
-define('DB_NAME', 'stailian');
+require_once __DIR__ . '/config.php';
 
 function getDB(): PDO {
     static $pdo = null;
