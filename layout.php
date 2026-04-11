@@ -125,6 +125,31 @@ if ($isLoggedIn) {
     echo '</nav><main>';
 }
 
+function authHeader(string $title, string $subtitle = ''): void {
+    echo '<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>' . htmlspecialchars($title) . ' · Stailian</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="stailian.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">⚜ STAILIAN</div>';
+    if ($subtitle) {
+        echo '<div class="auth-sub">' . htmlspecialchars($subtitle) . '</div>';
+    }
+}
+
+function authFooter(): void {
+    echo '  </div>
+</div>
+</body></html>';
+}
+
 function pageFooter(): void {
     echo '</main>
 <footer>Stailian Game Database &mdash; Admin Panel</footer>

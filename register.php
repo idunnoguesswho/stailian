@@ -1,5 +1,6 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) session_start();
+require 'layout.php';
 
 // Already logged in — go to walk
 if (!empty($_SESSION['userid'])) {
@@ -90,75 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Create Account · Stailian</title>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="stailian.css">
-<style>
-  .auth-wrap {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  .auth-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 2.5rem;
-    width: 100%;
-    max-width: 440px;
-  }
-  .auth-logo {
-    text-align: center;
-    font-family: 'Cinzel', serif;
-    font-size: 1.8rem;
-    font-weight: 900;
-    color: var(--gold);
-    letter-spacing: .12em;
-    margin-bottom: .2rem;
-  }
-  .auth-sub {
-    text-align: center;
-    color: var(--muted);
-    font-style: italic;
-    font-size: .9rem;
-    margin-bottom: 2rem;
-  }
-  .field-hint {
-    font-size: .68rem;
-    color: var(--muted);
-    margin-top: .2rem;
-  }
-  .strength-bar {
-    height: 4px;
-    border-radius: 4px;
-    background: var(--border);
-    margin-top: .3rem;
-    overflow: hidden;
-  }
-  .strength-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width .3s, background .3s;
-    width: 0%;
-  }
-</style>
-</head>
-<body>
-<div class="auth-wrap">
-
-  <div class="auth-card">
-    <div class="auth-logo">⚜ STAILIAN</div>
-    <div class="auth-sub">Create your account and enter the world</div>
+<?php authHeader('Create Account', 'Create your account and enter the world'); ?>
 
     <?php if ($error): ?>
       <div class="alert alert-error" style="margin-bottom:1.25rem;">

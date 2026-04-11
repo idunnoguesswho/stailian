@@ -7,6 +7,7 @@ if (!empty($_SESSION['userid'])) {
 }
 
 require 'db.php';
+require 'layout.php';
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -29,54 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Invalid username or password.';
     }
 }
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Login · Stailian</title>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="stailian.css">
-<style>
-  .auth-wrap {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-  }
-  .auth-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 2.5rem;
-    width: 100%;
-    max-width: 380px;
-  }
-  .auth-logo {
-    text-align: center;
-    font-family: 'Cinzel', serif;
-    font-size: 2rem;
-    font-weight: 900;
-    color: var(--gold);
-    letter-spacing: .12em;
-    margin-bottom: .2rem;
-  }
-  .auth-sub {
-    text-align: center;
-    color: var(--muted);
-    font-style: italic;
-    font-size: .9rem;
-    margin-bottom: 2rem;
-  }
-</style>
-</head>
-<body>
-<div class="auth-wrap">
-  <div class="auth-card">
-    <div class="auth-logo">⚜ STAILIAN</div>
-    <div class="auth-sub">Enter the world</div>
+<?php authHeader('Login', 'Enter the world'); ?>
 
     <?php if ($error): ?>
       <div class="alert alert-error" style="margin-bottom:1.25rem;">
@@ -124,7 +78,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </a>
     </div>
 
-  </div>
-</div>
-</body>
-</html>
+<?php authFooter(); ?>
