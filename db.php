@@ -1,7 +1,15 @@
 <?php
 ob_start();
 
-require_once __DIR__ . '/config.php';
+if (file_exists(__DIR__ . '/config.php')) {
+    require_once __DIR__ . '/config.php';
+} else {
+    // Local development fallback (USBWebserver)
+    define('DB_HOST', 'localhost');
+    define('DB_USER', 'root');
+    define('DB_PASS', 'usbw');
+    define('DB_NAME', 'stailian');
+}
 
 function getDB(): PDO {
     static $pdo = null;
