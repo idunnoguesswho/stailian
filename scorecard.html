@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scorecard · Stailian</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="stailian.css">
+</head>
+<body>
+<div id="page-header"></div>
+
+<h1 class="page-title">🃏 Scorecard</h1>
+<p class="page-sub">Your Stailian player profile</p>
+
+<div id="card-wrap" style="display:none;">
+<div class="grid-2">
+
+  <!-- LEFT: Player card -->
+  <div>
+    <div id="player-card" style="border-radius:16px;padding:1.5rem;
+         position:relative;overflow:hidden;max-width:380px;border:2px solid var(--border);">
+
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem;">
+        <div>
+          <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.15em;
+               color:var(--muted);margin-bottom:.15rem;">STAILIAN PLAYER</div>
+          <div id="card-name" style="font-family:'Cinzel',serif;font-size:1.4rem;
+               font-weight:900;color:var(--gold);line-height:1;"></div>
+          <div id="card-email" style="font-size:.8rem;color:var(--muted);margin-top:.15rem;"></div>
+        </div>
+        <div style="text-align:right;">
+          <div id="card-total" style="font-family:'Cinzel',serif;font-size:1.8rem;
+               font-weight:700;line-height:1;"></div>
+          <div style="font-size:.65rem;color:var(--muted);letter-spacing:.08em;">TOTAL POWER</div>
+        </div>
+      </div>
+
+      <!-- Avatar + outfit -->
+      <div style="background:rgba(0,0,0,.3);border-radius:12px;padding:1rem;
+           margin-bottom:1rem;display:flex;align-items:center;gap:1rem;">
+        <div style="position:relative;width:70px;height:70px;flex-shrink:0;">
+          <div style="position:absolute;inset:0;display:flex;flex-direction:column;
+               align-items:center;justify-content:center;font-size:2.8rem;">🧑</div>
+          <div id="avatar-shirt" style="position:absolute;bottom:18px;left:50%;
+               transform:translateX(-50%);width:32px;height:20px;border-radius:4px;
+               opacity:.8;display:none;"></div>
+          <div id="avatar-pants" style="position:absolute;bottom:4px;left:50%;
+               transform:translateX(-50%);width:30px;height:14px;border-radius:3px;
+               opacity:.8;display:none;"></div>
+        </div>
+        <div style="flex:1;" id="clothing-list"></div>
+      </div>
+
+      <!-- Element bars -->
+      <div style="margin-bottom:1rem;">
+        <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.1em;
+             color:var(--muted);margin-bottom:.5rem;">ELEMENTAL POWER</div>
+        <div id="element-bars"></div>
+      </div>
+
+      <!-- Battle stats -->
+      <div id="battle-stats" style="display:flex;gap:.75rem;flex-wrap:wrap;
+           border-top:1px solid rgba(255,255,255,.07);padding-top:.75rem;">
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Details -->
+  <div>
+
+    <!-- Weapons -->
+    <div class="card">
+      <div class="card-title">⚔ Weapons</div>
+      <div id="weapons-list" style="font-size:.9rem;color:var(--muted);">Loading…</div>
+    </div>
+
+    <!-- Recent battles -->
+    <div class="card">
+      <div class="card-title">⚔ Recent Battles</div>
+      <div id="battles-list" style="font-size:.9rem;"></div>
+    </div>
+
+    <!-- Move trail -->
+    <div class="card">
+      <div class="card-title">🗺 Recent Moves</div>
+      <div id="trail-list" style="font-size:.9rem;"></div>
+    </div>
+
+    <!-- Position -->
+    <div class="card">
+      <div class="card-title">📍 Position</div>
+      <div id="position-info" style="font-size:.9rem;color:var(--muted);"></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div id="page-footer"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script>
+const ELEMENTS   = ['ice','ground','fire','water','dark'];
+const ELEM_ICONS = { ice:'❄', ground:'🌍', fire:'🔥', water:'💧', dark:'🌑' };
+const ELEM_COLOR = { ice:'var(--ice)', ground:'var(--ground)', fire:'var(--fire)',
+                     water:'var(--water)', dark:'var(--dark)' };
+
+requireAuth(async user => {
+  renderPageHeader('scorecard.html', user);
+  renderPageFooter();
+
+  const uid = user.uid;
+
+  // Load everything in parallel
+  const [attrSnap, invSnap, equippedSnap, battlesSnap, trailSnap] = await Promise.all([
+    db.collection('user_attributes').where('uid', '==', uid).get(),
+    db.collection('inventory').where('uid', '==', uid).get(),
+    db.collection('user_clothing').where('uid', '==', uid).where('is_equipped', '==', true).get(),
+    db.collection('battle_log').where('uid', '==', uid).orderBy('fought_at', 'desc').limit(5).get(),
+    db.collection('user_move_trail').where('uid', '==', uid).orderBy('moved_at', 'desc').limit(5).get(),
+  ]);
+
+  // ── Element scores ──────────────────────────────────────────────────────────
+  const scores = Object.fromEntries(ELEMENTS.map(e => [e, 0]));
+
+  // Skills
+  for (const d of attrSnap.docs) {
+    const sk = await db.collection('skills').doc(d.data().skill_id).get();
+    if (sk.exists) for (const el of ELEMENTS) scores[el] += sk.data()[el + '_score'] ?? 0;
+  }
+  // Weapons
+  for (const d of invSnap.docs) {
+    const waSnap = await db.collection('weapon_attributes')
+      .where('weapon_id', '==', d.data().weapon_id).get();
+    for (const wa of waSnap.docs) {
+      const sk = await db.collection('skills').doc(wa.data().skill_id).get();
+      if (sk.exists) for (const el of ELEMENTS) scores[el] += sk.data()[el + '_score'] ?? 0;
+    }
+  }
+  // Clothing dye bonuses
+  for (const d of equippedSnap.docs) {
+    const cloth = d.data();
+    if (cloth.colour_shade_id) {
+      const shade = await db.collection('colour_shades').doc(cloth.colour_shade_id).get();
+      if (shade.exists && shade.data().element && shade.data().skill_bonus > 0) {
+        scores[shade.data().element] = (scores[shade.data().element] ?? 0) + shade.data().skill_bonus;
+      }
+    }
+  }
+
+  const total    = Object.values(scores).reduce((a, b) => a + b, 0);
+  const maxScore = Math.max(1, ...Object.values(scores));
+  const dominant = ELEMENTS.reduce((a, b) => scores[a] >= scores[b] ? a : b);
+
+  // ── Style the card ──────────────────────────────────────────────────────────
+  const card = document.getElementById('player-card');
+  card.style.background = `linear-gradient(135deg,var(--card) 60%,${ELEM_COLOR[dominant]}22)`;
+  card.style.borderColor = ELEM_COLOR[dominant];
+
+  document.getElementById('card-name').textContent  = user.name;
+  document.getElementById('card-email').textContent = user.email;
+  document.getElementById('card-total').textContent = total;
+  document.getElementById('card-total').style.color = ELEM_COLOR[dominant];
+
+  // ── Element bars ────────────────────────────────────────────────────────────
+  document.getElementById('element-bars').innerHTML = ELEMENTS.map(el => `
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;">
+      <div style="width:1.2rem;text-align:center;font-size:.85rem;flex-shrink:0;">${ELEM_ICONS[el]}</div>
+      <div style="flex:1;background:var(--border);border-radius:10px;height:8px;overflow:hidden;">
+        <div style="background:${ELEM_COLOR[el]};width:${Math.round((scores[el]/maxScore)*100)}%;
+             height:100%;border-radius:10px;transition:width .4s;"></div>
+      </div>
+      <div style="width:2rem;text-align:right;font-family:'Cinzel',serif;
+           font-size:.78rem;color:${ELEM_COLOR[el]};">${scores[el]}</div>
+    </div>`).join('');
+
+  // ── Equipped clothing ───────────────────────────────────────────────────────
+  const equipped = {};
+  for (const d of equippedSnap.docs) equipped[d.data().slot] = d.data();
+
+  if (equipped.shirt?.hex_value) {
+    const el = document.getElementById('avatar-shirt');
+    el.style.background = equipped.shirt.hex_value; el.style.display = '';
+  }
+  if (equipped.pants?.hex_value) {
+    const el = document.getElementById('avatar-pants');
+    el.style.background = equipped.pants.hex_value; el.style.display = '';
+  }
+
+  document.getElementById('clothing-list').innerHTML =
+    ['shirt','pants','socks'].map(slot => {
+      const icons = { shirt:'👕', pants:'👖', socks:'🧦' };
+      const item  = equipped[slot];
+      return `<div style="font-size:.78rem;color:var(--muted);margin-bottom:.15rem;">
+        ${icons[slot]}
+        ${item
+          ? `<span style="color:var(--text);">${escHtml(item.type_name ?? slot)}</span>
+             ${item.hex_value ? `<span style="color:${item.hex_value}"> · ${escHtml(item.colour_name ?? '')}</span>` : ''}`
+          : `<em>None</em>`}
+      </div>`;
+    }).join('') + `<div style="font-size:.78rem;color:var(--gold);margin-top:.25rem;">🪙 ${user.coins ?? 0} coins</div>`;
+
+  // ── Battle stats ────────────────────────────────────────────────────────────
+  const bf  = user.battles_fought ?? 0;
+  const bw  = user.battles_won    ?? 0;
+  const wr  = bf > 0 ? Math.round((bw / bf) * 100) : 0;
+  document.getElementById('battle-stats').innerHTML = [
+    ['⚔', 'Battles', bf],
+    ['🏆', 'Wins',    bw],
+    ['📊', 'Win Rate', wr + '%'],
+  ].map(([icon, label, val]) => `
+    <div style="text-align:center;flex:1;min-width:60px;">
+      <div style="font-size:1.1rem;">${icon}</div>
+      <div style="font-family:'Cinzel',serif;font-size:.9rem;color:var(--text);">${val}</div>
+      <div style="font-size:.62rem;color:var(--muted);letter-spacing:.06em;">${label.toUpperCase()}</div>
+    </div>`).join('');
+
+  // ── Weapons ─────────────────────────────────────────────────────────────────
+  const weaponNames = [];
+  for (const d of invSnap.docs) {
+    const w = await db.collection('weapons').doc(d.data().weapon_id).get();
+    if (w.exists) weaponNames.push(w.data().name ?? 'Unknown');
+  }
+  document.getElementById('weapons-list').innerHTML = weaponNames.length
+    ? weaponNames.map(n => `<div style="padding:.2rem 0;border-bottom:1px solid rgba(42,45,62,.4);">
+        ⚔ ${escHtml(n)}</div>`).join('')
+    : '<span style="color:var(--muted);">No weapons yet.</span>';
+
+  // ── Recent battles ──────────────────────────────────────────────────────────
+  if (battlesSnap.empty) {
+    document.getElementById('battles-list').innerHTML =
+      '<span style="color:var(--muted);">No battles yet.</span>';
+  } else {
+    document.getElementById('battles-list').innerHTML = battlesSnap.docs.map(d => {
+      const b   = d.data();
+      const won = b.user_won;
+      return `<div style="padding:.3rem 0;border-bottom:1px solid rgba(42,45,62,.4);display:flex;
+           justify-content:space-between;align-items:center;">
+        <span>${escHtml(b.char_id ?? 'Unknown')}</span>
+        <span style="color:${won ? 'var(--success)' : 'var(--danger)'};
+              font-family:'Cinzel',serif;font-size:.75rem;">
+          ${won ? 'WON' : 'LOST'}
+        </span>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Move trail ──────────────────────────────────────────────────────────────
+  if (trailSnap.empty) {
+    document.getElementById('trail-list').innerHTML =
+      '<span style="color:var(--muted);">No moves yet.</span>';
+  } else {
+    document.getElementById('trail-list').innerHTML = trailSnap.docs.map(d => {
+      const m = d.data();
+      return `<div style="padding:.25rem 0;border-bottom:1px solid rgba(42,45,62,.4);">
+        ${m.tile_icon ?? '🗺'} (${m.coord_x},${m.coord_y}) — <em style="color:var(--muted);">
+        ${escHtml(m.tile_type_name ?? '')}</em></div>`;
+    }).join('');
+  }
+
+  // ── Position ────────────────────────────────────────────────────────────────
+  document.getElementById('position-info').innerHTML = user.position_x != null
+    ? `(${user.position_x}, ${user.position_y}) on the <strong>${capitalize(user.layer ?? 'surface')}</strong> layer`
+    : 'Not on the map yet.';
+
+  document.getElementById('card-wrap').style.display = '';
+});
+
+function capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+</script>
+</body>
+</html>

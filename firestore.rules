@@ -1,0 +1,171 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
+    // Is the request from a signed-in user?
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Is the signed-in user the owner of this record?
+    function isOwner(uid) {
+      return isAuth() && request.auth.uid == uid;
+    }
+
+    // Is the signed-in user an admin?
+    // Reads the is_admin flag from their own users document.
+    function isAdmin() {
+      return isAuth() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.is_admin == true;
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────────────
+    // Each user can read and update their own profile.
+    // Only admins can create/delete user documents (normal users are created
+    // via Firebase Auth + register.html which writes the initial doc).
+    // Allow create so register.html can write the first document.
+    match /users/{uid} {
+      allow read:   if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Game world (read-only for players, write for admins) ───────────────────
+    match /map_tiles/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /tile_types/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /layer_multipliers/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /nav_menu/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── Characters, weapons, skills (read-only for players) ───────────────────
+    match /characters/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /weapons/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /skills/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /clothing_types/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /colours/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /colour_shades/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── Character attributes and inventory (admin-managed) ────────────────────
+    match /char_attributes/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /char_inventory/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    match /character_positions/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAuth();   // walk.html moves chars after battle
+    }
+
+    // ── Weapon attributes (admin-managed) ─────────────────────────────────────
+    match /weapon_attributes/{doc} {
+      allow read:  if isAuth();
+      allow write: if isAdmin();
+    }
+
+    // ── User-owned collections ─────────────────────────────────────────────────
+    // Documents are keyed by uid or have a uid field.
+    // Players can only touch their own records.
+
+    match /user_attributes/{doc} {
+      allow read:  if isAuth() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if isAdmin();   // only admins assign skills to users
+    }
+
+    match /inventory/{doc} {
+      allow read:  if isAuth() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isOwner(request.resource.data.uid);
+      allow update: if isOwner(resource.data.uid) || isAdmin();
+      allow delete: if isOwner(resource.data.uid) || isAdmin();
+    }
+
+    match /user_clothing/{doc} {
+      allow read:  if isAuth() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if isOwner(request.resource.data.uid) || isAdmin();
+    }
+
+    match /user_flowers/{doc} {
+      allow read:  if isAuth() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if isOwner(request.resource.data.uid);
+    }
+
+    match /user_scrolls/{doc} {
+      allow read:  if isAuth() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if isOwner(request.resource.data.uid);
+    }
+
+    match /user_dyes/{doc} {
+      allow read:  if isAuth() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
+      allow write: if isOwner(request.resource.data.uid);
+    }
+
+    match /user_move_trail/{doc} {
+      allow read:  if isAuth() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isOwner(request.resource.data.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /battle_log/{doc} {
+      allow read:  if isAuth() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
+      allow create: if isOwner(request.resource.data.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Username lookup (needed by login to find email by username) ────────────
+    // login.html queries users where username == X — the read rule on /users
+    // above covers this since it allows isAdmin(), but players querying
+    // OTHER users' documents would be blocked. We need a public username→email
+    // lookup. Use a separate lightweight collection for this.
+    match /usernames/{username} {
+      allow read:  if true;        // anyone can look up "does this username exist"
+      allow write: if isAdmin() ||
+        (isAuth() && request.resource.data.uid == request.auth.uid);
+    }
+
+  }
+}

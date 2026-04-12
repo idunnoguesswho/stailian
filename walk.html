@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Walk · Stailian</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="stailian.css">
+</head>
+<body>
+<div id="page-header"></div>
+
+<div id="flash-zone"></div>
+
+<!-- ── CHARACTER SELECT (shown when user has no character) ───────────────── -->
+<div id="char-select-wrap" style="display:none;">
+  <h1 class="page-title">Choose Your Character</h1>
+  <p class="page-sub">Pick a character to represent you on the map.</p>
+  <div id="char-list" class="grid-3"></div>
+</div>
+
+<!-- ── MAIN GAME ─────────────────────────────────────────────────────────── -->
+<div id="game-wrap" style="display:none;">
+
+  <!-- Top info bar -->
+  <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:center;margin-bottom:1.5rem;">
+    <div>
+      <span class="page-title" style="font-size:1.3rem;" id="char-name-display">—</span>
+      <span class="page-sub" style="margin:0 0 0 .5rem;" id="clock-display"></span>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:.6rem;flex-wrap:wrap;">
+      <button class="btn btn-outline btn-sm" onclick="doSleep()" id="sleepBtn">😴 Sleep</button>
+      <a href="wardrobe.html" class="btn btn-outline btn-sm">👕 Wardrobe</a>
+      <a href="scorecard.html" class="btn btn-outline btn-sm">🃏 Scorecard</a>
+    </div>
+  </div>
+
+  <div class="grid-2" style="gap:1.5rem;">
+
+    <!-- LEFT: Dice + result -->
+    <div>
+      <div class="card" style="text-align:center;">
+        <div id="dice-display" style="font-size:2.5rem;margin-bottom:.5rem;
+             min-height:3rem;letter-spacing:.3em;">⚀ ⚀</div>
+        <div id="tile-result" style="margin-bottom:1rem;min-height:2rem;"></div>
+        <button class="btn btn-primary" onclick="doRoll()" id="rollBtn"
+                style="font-size:.9rem;padding:.65rem 2rem;">
+          🎲 Roll the Dice
+        </button>
+      </div>
+
+      <!-- Roll outcome card -->
+      <div id="outcome-card" style="display:none;" class="card"></div>
+
+      <!-- Current tile -->
+      <div class="card" style="margin-top:0;" id="tile-info-card">
+        <div class="card-title">Current Tile</div>
+        <div id="tile-info">Not on the map yet.</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Stats + move trail -->
+    <div>
+      <!-- Stats -->
+      <div class="card">
+        <div class="card-title">Your Status</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;">
+          <div>
+            <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.1em;
+                 color:var(--gold-dim);margin-bottom:.3rem;">HEALTH</div>
+            <div id="health-display" style="font-size:1.1rem;"></div>
+            <div id="health-bar-wrap" style="margin-top:.4rem;background:rgba(255,255,255,.07);
+                 border-radius:10px;height:8px;overflow:hidden;">
+              <div id="health-bar" style="height:100%;border-radius:10px;
+                   background:var(--success);transition:width .4s;"></div>
+            </div>
+          </div>
+          <div>
+            <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.1em;
+                 color:var(--gold-dim);margin-bottom:.3rem;">COINS</div>
+            <div id="coins-display" style="font-size:1.1rem;color:var(--gold);">—</div>
+          </div>
+          <div>
+            <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.1em;
+                 color:var(--gold-dim);margin-bottom:.3rem;">POSITION</div>
+            <div id="pos-display" style="font-size:.95rem;">—</div>
+          </div>
+          <div>
+            <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.1em;
+                 color:var(--gold-dim);margin-bottom:.3rem;">LAYER</div>
+            <div id="layer-display" style="font-size:.95rem;">—</div>
+          </div>
+        </div>
+
+        <!-- Element scores -->
+        <div style="margin-top:1rem;">
+          <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.1em;
+               color:var(--gold-dim);margin-bottom:.5rem;">ELEMENT SCORES</div>
+          <div id="element-scores" style="display:flex;gap:.4rem;flex-wrap:wrap;"></div>
+        </div>
+      </div>
+
+      <!-- Inventory summary -->
+      <div class="card">
+        <div class="card-title">Inventory</div>
+        <div id="inventory-summary" style="font-size:.9rem;color:var(--muted);">Loading…</div>
+      </div>
+
+      <!-- Recent moves -->
+      <div class="card">
+        <div class="card-title">Recent Moves</div>
+        <div id="move-trail" style="font-size:.88rem;"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="page-footer"></div>
+
+<!-- Firebase compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────────────────────
+const MAX_SCROLLS = 30;
+const MAX_FLOWERS = 120;
+const MAX_BOWTIES = 4;
+const ELEMENTS    = ['ice','ground','fire','water','dark'];
+const ELEM_COLOR  = { ice:'var(--ice)', ground:'var(--ground)', fire:'var(--fire)',
+                      water:'var(--water)', dark:'var(--dark)' };
+const DICE_FACES  = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────────────
+let currentUser = null;   // Firestore user profile
+let mapTiles    = [];     // all tiles on current Z level
+let tileTypes   = {};     // id → tile type object
+let characters  = {};     // id → character object
+let rolling     = false;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────────────────────────────────────
+requireAuth(async user => {
+  currentUser = user;
+  renderPageHeader('walk.html', user);
+  renderPageFooter();
+
+  // Flash from redirect
+  document.getElementById('flash-zone').innerHTML = getFlash();
+
+  // Auto-heal
+  const healedHp = await autoHeal(user.uid, user);
+  currentUser.health = healedHp;
+
+  // Load map + types in parallel
+  await Promise.all([loadTileTypes(), loadMapTiles(user.layer ?? 'surface')]);
+
+  // Load characters
+  const charSnap = await db.collection('characters').get();
+  charSnap.forEach(d => characters[d.id] = { id: d.id, ...d.data() });
+
+  if (!user.char_id) {
+    showCharSelect();
+  } else {
+    showGame();
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Data loaders
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadTileTypes() {
+  const snap = await db.collection('tile_types').get();
+  snap.forEach(d => tileTypes[d.id] = { id: d.id, ...d.data() });
+}
+
+async function loadMapTiles(layer) {
+  const z = layerToZ(layer);
+  const snap = await db.collection('map_tiles').where('coord_z', '==', z).get();
+  mapTiles = [];
+  snap.forEach(d => mapTiles.push({ id: d.id, ...d.data() }));
+}
+
+function layerToZ(layer) {
+  if (layer === 'sky')         return 1;
+  if (layer === 'underworld')  return -1;
+  return 0;
+}
+function zToLayer(z) {
+  if (z ===  1) return 'Sky';
+  if (z === -1) return 'Underworld';
+  return 'Surface';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Character selection
+// ─────────────────────────────────────────────────────────────────────────────
+function showCharSelect() {
+  document.getElementById('char-select-wrap').style.display = '';
+  document.getElementById('game-wrap').style.display = 'none';
+
+  const list = document.getElementById('char-list');
+  const chars = Object.values(characters);
+  if (!chars.length) {
+    list.innerHTML = '<p style="color:var(--muted)">No characters available yet. Ask an admin to add some.</p>';
+    return;
+  }
+  list.innerHTML = chars.map(c => `
+    <div class="card" style="cursor:pointer;transition:border-color .2s;"
+         onmouseenter="this.style.borderColor='var(--gold)'"
+         onmouseleave="this.style.borderColor=''"
+         onclick="selectChar('${c.id}','${escHtml(c.name)}')">
+      <div class="card-title">${escHtml(c.name)}</div>
+      <p style="font-size:.88rem;color:var(--muted);">
+        ${escHtml(c.description ?? '')}
+      </p>
+      <div style="margin-top:.75rem;display:flex;gap:.3rem;flex-wrap:wrap;">
+        ${ELEMENTS.map(el => `
+          <span style="font-size:.7rem;background:rgba(255,255,255,.04);
+                border:1px solid var(--border);border-radius:4px;
+                padding:.15rem .45rem;color:${ELEM_COLOR[el]};">
+            ${el} ${c[el + '_score'] ?? 0}
+          </span>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+async function selectChar(charId, charName) {
+  await db.collection('users').doc(currentUser.uid).update({ char_id: charId });
+  currentUser.char_id = charId;
+  document.getElementById('char-select-wrap').style.display = 'none';
+  showGame();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main game display
+// ─────────────────────────────────────────────────────────────────────────────
+function showGame() {
+  document.getElementById('game-wrap').style.display = '';
+  const char = characters[currentUser.char_id];
+  document.getElementById('char-name-display').textContent =
+    char ? char.name : 'Your Character';
+  updateStatusDisplay();
+  loadInventorySummary();
+  loadMoveTrail();
+  if (currentUser.position_x != null) {
+    const tile = findTileAt(currentUser.position_x, currentUser.position_y);
+    if (tile) renderTileInfo(tile);
+  }
+}
+
+function updateStatusDisplay() {
+  const u   = currentUser;
+  const hp  = u.health ?? 100;
+  const max = u.max_health ?? 100;
+  const pct = Math.round((hp / max) * 100);
+  const col = pct > 60 ? 'var(--success)' : pct > 25 ? 'var(--fire)' : 'var(--danger)';
+
+  document.getElementById('health-display').innerHTML =
+    `<span style="color:${col};">${hp}</span> <span style="color:var(--muted);font-size:.85rem;">/ ${max}</span>`;
+  document.getElementById('health-bar').style.width      = pct + '%';
+  document.getElementById('health-bar').style.background = col;
+  document.getElementById('coins-display').textContent   = (u.coins ?? 0) + ' 🪙';
+  document.getElementById('pos-display').textContent =
+    u.position_x != null ? `(${u.position_x}, ${u.position_y})` : 'Not on map';
+  document.getElementById('layer-display').textContent   = u.layer ? capitalize(u.layer) : 'Surface';
+  document.getElementById('clock-display').textContent   = formatClock(u);
+  renderElementScores();
+}
+
+function renderElementScores() {
+  // Build scores from user's skills/weapons (simplified: read cached totals if stored)
+  const scores = currentUser.element_scores ?? {};
+  const html = ELEMENTS.map(el => `
+    <div style="display:flex;flex-direction:column;align-items:center;
+         background:rgba(255,255,255,.03);border:1px solid var(--border);
+         border-radius:5px;padding:.3rem .6rem;min-width:52px;">
+      <span style="font-size:.62rem;color:${ELEM_COLOR[el]};font-family:'Cinzel',serif;
+            letter-spacing:.06em;">${el.toUpperCase()}</span>
+      <span style="font-size:1rem;color:var(--text);">${scores[el] ?? 0}</span>
+    </div>`).join('');
+  document.getElementById('element-scores').innerHTML = html;
+}
+
+function formatClock(user) {
+  const day  = user.game_day  ?? 1;
+  const hour = user.game_hour ?? 8;
+  const h    = String(hour).padStart(2,'0');
+  const period = hour < 6 ? '🌙 Night' : hour < 12 ? '🌅 Dawn'
+               : hour < 18 ? '☀ Day' : '🌆 Dusk';
+  return `Day ${day} · ${h}:00 · ${period}`;
+}
+
+function findTileAt(x, y) {
+  return mapTiles.find(t => t.coord_x === x && t.coord_y === y) ?? null;
+}
+
+function renderTileInfo(tile) {
+  const tt = tileTypes[tile.tile_type_id] ?? {};
+  const magic = (tile.coord_x === tile.coord_y)
+    ? '<span style="color:var(--gold);margin-left:.5rem;">✨ Magic Ground</span>' : '';
+  const tower = (tile.coord_x === 5 && tile.coord_y === 5)
+    ? '<span style="color:var(--ice);margin-left:.5rem;">🗼 Tower</span>' : '';
+  document.getElementById('tile-info').innerHTML = `
+    <div style="font-size:1.4rem;">${tt.icon ?? '?'} <strong>${escHtml(tt.name ?? 'Unknown')}</strong>
+      ${magic}${tower}
+    </div>
+    <div style="margin-top:.4rem;font-size:.88rem;color:var(--muted);">
+      Position (${tile.coord_x}, ${tile.coord_y}) · Dice ${tile.dice_number ?? '?'}
+      ${tt.element ? `· <span style="color:${ELEM_COLOR[tt.element] ?? 'inherit'};">${tt.element}</span>` : ''}
+    </div>
+    ${tt.resource ? `<div style="margin-top:.3rem;font-size:.85rem;">Resource: <em>${escHtml(tt.resource)}</em></div>` : ''}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Roll dice
+// ─────────────────────────────────────────────────────────────────────────────
+async function doRoll() {
+  if (rolling) return;
+  rolling = true;
+  const btn = document.getElementById('rollBtn');
+  btn.disabled = true; btn.textContent = '⏳ Rolling…';
+  document.getElementById('outcome-card').style.display = 'none';
+
+  // Animate dice
+  let anim = 0;
+  const diceEl = document.getElementById('dice-display');
+  const animInterval = setInterval(() => {
+    diceEl.textContent = randFace() + ' ' + randFace();
+    if (++anim > 10) clearInterval(animInterval);
+  }, 80);
+
+  const die1 = rand(1,12);
+  const die2 = rand(1,12);
+
+  await new Promise(r => setTimeout(r, 900));
+  clearInterval(animInterval);
+  diceEl.textContent = dieFace(die1) + ' ' + dieFace(die2);
+
+  if (!mapTiles.length) {
+    document.getElementById('tile-result').innerHTML =
+      '<span style="color:var(--danger);">Map not loaded. Ask an admin to add tiles.</span>';
+    btn.disabled = false; btn.textContent = '🎲 Roll the Dice'; rolling = false; return;
+  }
+
+  // Find nearest tile
+  const tile = nearestTile(die1, die2);
+  document.getElementById('tile-result').innerHTML =
+    `<span style="color:var(--muted);font-size:.85rem;">
+      Rolled (${die1}, ${die2}) → nearest tile (${tile.coord_x}, ${tile.coord_y})
+    </span>`;
+
+  const z   = layerToZ(currentUser.layer ?? 'surface');
+  const uid = currentUser.uid;
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+
+  // Gather outcomes
+  const tt          = tileTypes[tile.tile_type_id] ?? {};
+  const isMagic     = tile.coord_x === tile.coord_y;
+  const isTower     = tile.coord_x === 5 && tile.coord_y === 5;
+  const outcomes    = [];
+
+  // ── Update position
+  await db.collection('users').doc(uid).update({
+    position_x: tile.coord_x,
+    position_y: tile.coord_y,
+    layer:      currentUser.layer ?? 'surface',
+  });
+  currentUser.position_x = tile.coord_x;
+  currentUser.position_y = tile.coord_y;
+
+  // ── Log move trail
+  await db.collection('user_move_trail').add({
+    uid, coord_x: tile.coord_x, coord_y: tile.coord_y, coord_z: z,
+    tile_type_name: tt.name ?? '', tile_icon: tt.icon ?? '',
+    moved_at: now,
+  });
+
+  // ── Advance game clock (+30 min)
+  let gameHour = (currentUser.game_hour ?? 8) + 0.5;
+  let gameDay  = currentUser.game_day  ?? 1;
+  if (gameHour >= 24) { gameHour -= 24; gameDay++; }
+  await db.collection('users').doc(uid).update({ game_hour: gameHour, game_day: gameDay });
+  currentUser.game_hour = gameHour;
+  currentUser.game_day  = gameDay;
+
+  // ── Gather flower (if tile has a colour)
+  if (tt.colour_id) {
+    const flowerRef   = db.collection('user_flowers').doc(`${uid}_${tt.colour_id}`);
+    const flowerSnap  = await flowerRef.get();
+    const totalFlowers = flowerSnap.exists ? (flowerSnap.data().quantity ?? 0) : 0;
+    if (totalFlowers < MAX_FLOWERS) {
+      await flowerRef.set({ uid, colour_id: tt.colour_id,
+        colour_name: tt.colour_name ?? tt.name, quantity: totalFlowers + 1,
+        hex: tt.hex_color ?? '#888' }, { merge: true });
+      outcomes.push(`🌸 Gathered a <strong>${escHtml(tt.colour_name ?? tt.name)}</strong> flower`);
+    } else {
+      outcomes.push('🌸 Flower bag full (120/120)! Convert flowers to scrolls in Wardrobe.');
+    }
+  }
+
+  // ── Gather scroll
+  if (tt.colour_id) {
+    const scrollRef  = db.collection('user_scrolls').doc(`${uid}_${tt.colour_id}`);
+    const scrollSnap = await scrollRef.get();
+    const total      = scrollSnap.exists ? (scrollSnap.data().quantity ?? 0) : 0;
+    if (total < MAX_SCROLLS) {
+      await scrollRef.set({ uid, colour_id: tt.colour_id,
+        colour_name: tt.colour_name ?? tt.name, quantity: total + 1,
+        hex: tt.hex_color ?? '#888' }, { merge: true });
+      outcomes.push(`📜 Gathered a <strong>${escHtml(tt.colour_name ?? tt.name)}</strong> scroll`);
+    } else {
+      outcomes.push('📜 Scroll bag full (30/30)!');
+    }
+  }
+
+  // ── Magic ground: bowtie pickup
+  if (isMagic) {
+    outcomes.push('✨ <strong>Magic Ground!</strong> X = Y — checking for bowtie…');
+    const bowtieSnap = await db.collection('weapons')
+      .where('is_bowtie', '==', true)
+      .where('tile_type', '==', tt.name ?? '')
+      .limit(1).get();
+    if (!bowtieSnap.empty) {
+      const bw = { id: bowtieSnap.docs[0].id, ...bowtieSnap.docs[0].data() };
+      const hasIt = await db.collection('inventory')
+        .where('uid', '==', uid).where('weapon_id', '==', bw.id).limit(1).get();
+      if (hasIt.empty) {
+        await db.collection('inventory').add({ uid, weapon_id: bw.id, assigned_at: now });
+        outcomes.push(`🎀 Found a <strong>${escHtml(bw.name)}</strong> bowtie!`);
+      } else {
+        outcomes.push('🎀 You already have that bowtie.');
+      }
+    }
+  }
+
+  // ── Tower notification
+  if (isTower) {
+    outcomes.push('🗼 You\'re at the <strong>Tower (5,5)</strong> — visit the <a href="tower.html">Tower</a> to change layers!');
+  }
+
+  // ── Battle (if character is on same tile)
+  const battleResult = await checkBattle(tile.coord_x, tile.coord_y, z);
+  if (battleResult) {
+    const br = battleResult;
+    const won = br.userWon;
+    outcomes.push(won
+      ? `⚔ <strong>Battle won!</strong> vs ${escHtml(br.charName)} — ${br.userTotal.toFixed(1)} vs ${br.charTotal.toFixed(1)} +5 🪙`
+      : `⚔ <strong>Battle lost</strong> vs ${escHtml(br.charName)} — ${br.userTotal.toFixed(1)} vs ${br.charTotal.toFixed(1)} — ${br.damage} HP lost`
+    );
+    if (won) {
+      const newCoins = (currentUser.coins ?? 0) + 5;
+      await db.collection('users').doc(uid).update({ coins: newCoins });
+      currentUser.coins = newCoins;
+    } else {
+      const newHp = Math.max(0, (currentUser.health ?? 100) - br.damage);
+      await db.collection('users').doc(uid).update({ health: newHp });
+      currentUser.health = newHp;
+    }
+    // Log battle
+    await db.collection('battle_log').add({
+      uid, char_id: br.charId, tile_x: tile.coord_x, tile_y: tile.coord_y,
+      user_won: br.userWon, user_total: br.userTotal, char_total: br.charTotal,
+      damage: br.damage, fought_at: now,
+    });
+    // Update stats
+    await db.collection('users').doc(uid).update({
+      battles_fought: firebase.firestore.FieldValue.increment(1),
+      battles_won:    firebase.firestore.FieldValue.increment(won ? 1 : 0),
+    });
+  }
+
+  // ── Render outcomes
+  renderTileInfo(tile);
+  updateStatusDisplay();
+  loadInventorySummary();
+  loadMoveTrail();
+
+  const outcomeCard = document.getElementById('outcome-card');
+  outcomeCard.style.display = '';
+  outcomeCard.innerHTML = `
+    <div class="card-title">${tt.icon ?? '🗺'} ${escHtml(tt.name ?? 'Unknown Tile')}</div>
+    ${outcomes.length
+      ? outcomes.map(o => `<div style="padding:.3rem 0;border-bottom:1px solid rgba(42,45,62,.5);
+          font-size:.92rem;">${o}</div>`).join('')
+      : '<div style="color:var(--muted);font-size:.9rem;">Nothing notable happened.</div>'
+    }`;
+
+  btn.disabled = false; btn.textContent = '🎲 Roll the Dice'; rolling = false;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Battle
+// ─────────────────────────────────────────────────────────────────────────────
+async function checkBattle(x, y, z) {
+  const charId = currentUser.char_id;
+  if (!charId) return null;
+
+  // Check if character is on same tile
+  const cpSnap = await db.collection('character_positions').doc(charId).get();
+  if (!cpSnap.exists) return null;
+  const cp = cpSnap.data();
+  if (cp.coord_x !== x || cp.coord_y !== y || cp.coord_z !== z) return null;
+
+  // Compute scores
+  const userScores = await getUserElementScores(currentUser.uid);
+  const charScores = await getCharElementScores(charId);
+
+  let userW = 0, charW = 0;
+  for (const el of ELEMENTS) {
+    if (userScores[el] > charScores[el])      userW++;
+    else if (charScores[el] > userScores[el]) charW++;
+  }
+  const userWon  = userW >= charW;
+  const userTotal = Object.values(userScores).reduce((a,b) => a+b, 0);
+  const charTotal = Object.values(charScores).reduce((a,b) => a+b, 0);
+  const damage   = userWon ? 0 : Math.max(5, Math.floor(charTotal / 10) * 5);
+
+  // Move character randomly after battle
+  if (mapTiles.length) {
+    const rt = mapTiles[Math.floor(Math.random() * mapTiles.length)];
+    await db.collection('character_positions').doc(charId).set({
+      coord_x: rt.coord_x, coord_y: rt.coord_y, coord_z: z,
+    });
+  }
+
+  return {
+    charId, charName: characters[charId]?.name ?? charId,
+    userWon, userTotal, charTotal, damage
+  };
+}
+
+async function getUserElementScores(uid) {
+  const totals = Object.fromEntries(ELEMENTS.map(e => [e, 0]));
+  // From skills
+  const attrSnap = await db.collection('user_attributes').where('uid', '==', uid).get();
+  const skillIds = attrSnap.docs.map(d => d.data().skill_id);
+  for (const sid of skillIds) {
+    const sk = await db.collection('skills').doc(sid).get();
+    if (sk.exists) for (const el of ELEMENTS) totals[el] += sk.data()[el + '_score'] ?? 0;
+  }
+  // From weapons
+  const invSnap = await db.collection('inventory').where('uid', '==', uid).get();
+  for (const inv of invSnap.docs) {
+    const waSnap = await db.collection('weapon_attributes')
+      .where('weapon_id', '==', inv.data().weapon_id).get();
+    for (const wa of waSnap.docs) {
+      const sk = await db.collection('skills').doc(wa.data().skill_id).get();
+      if (sk.exists) for (const el of ELEMENTS) totals[el] += sk.data()[el + '_score'] ?? 0;
+    }
+  }
+  return totals;
+}
+
+async function getCharElementScores(charId) {
+  const totals = Object.fromEntries(ELEMENTS.map(e => [e, 0]));
+  const attrSnap = await db.collection('char_attributes').where('char_id', '==', charId).get();
+  const skillIds = attrSnap.docs.map(d => d.data().skill_id);
+  for (const sid of skillIds) {
+    const sk = await db.collection('skills').doc(sid).get();
+    if (sk.exists) for (const el of ELEMENTS) totals[el] += sk.data()[el + '_score'] ?? 0;
+  }
+  return totals;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sleep
+// ─────────────────────────────────────────────────────────────────────────────
+async function doSleep() {
+  const btn = document.getElementById('sleepBtn');
+  btn.disabled = true; btn.textContent = '😴 Sleeping…';
+
+  let hour = (currentUser.game_hour ?? 8) + 8;
+  let day  = currentUser.game_day  ?? 1;
+  if (hour >= 24) { hour -= 24; day++; }
+
+  await db.collection('users').doc(currentUser.uid).update({
+    game_hour:  hour,
+    game_day:   day,
+    health:     currentUser.max_health ?? 100,
+    last_heal:  firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  currentUser.game_hour = hour;
+  currentUser.game_day  = day;
+  currentUser.health    = currentUser.max_health ?? 100;
+
+  updateStatusDisplay();
+  btn.disabled = false; btn.textContent = '😴 Sleep';
+  document.getElementById('flash-zone').innerHTML =
+    `<div class="alert alert-success">😴 Slept 8 hours — full health restored! Day ${day}.</div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Inventory summary
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadInventorySummary() {
+  const uid = currentUser.uid;
+  const [flowersSnap, scrollsSnap, invSnap] = await Promise.all([
+    db.collection('user_flowers').where('uid', '==', uid).get(),
+    db.collection('user_scrolls').where('uid', '==', uid).get(),
+    db.collection('inventory').where('uid', '==', uid).get(),
+  ]);
+
+  let flowers = 0, scrolls = 0;
+  flowersSnap.forEach(d => flowers += d.data().quantity ?? 0);
+  scrollsSnap.forEach(d => scrolls += d.data().quantity ?? 0);
+
+  document.getElementById('inventory-summary').innerHTML = `
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+      <span>🌸 ${flowers} / ${MAX_FLOWERS} flowers</span>
+      <span>📜 ${scrolls} / ${MAX_SCROLLS} scrolls</span>
+      <span>⚔ ${invSnap.size} weapon${invSnap.size !== 1 ? 's' : ''}</span>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Move trail
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadMoveTrail() {
+  const snap = await db.collection('user_move_trail')
+    .where('uid', '==', currentUser.uid)
+    .orderBy('moved_at', 'desc')
+    .limit(8)
+    .get();
+
+  if (snap.empty) {
+    document.getElementById('move-trail').innerHTML =
+      '<span style="color:var(--muted);">No moves yet.</span>';
+    return;
+  }
+  document.getElementById('move-trail').innerHTML = snap.docs.map(d => {
+    const m = d.data();
+    return `<div style="padding:.25rem 0;border-bottom:1px solid rgba(42,45,62,.4);">
+      ${m.tile_icon} (${m.coord_x},${m.coord_y}) ${zToLayer(m.coord_z ?? 0)}
+      — <em style="color:var(--muted);">${escHtml(m.tile_type_name ?? '')}</em>
+    </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+function nearestTile(x, y) {
+  return mapTiles.reduce((best, t) => {
+    const d  = Math.abs(t.coord_x - x) + Math.abs(t.coord_y - y);
+    const bd = Math.abs(best.coord_x - x) + Math.abs(best.coord_y - y);
+    return d < bd ? t : best;
+  });
+}
+
+function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function randFace()      { return DICE_FACES[Math.floor(Math.random() * 6)]; }
+function dieFace(n)      { return n <= 6 ? DICE_FACES[n - 1] : '🎲'; }
+function capitalize(s)   { return s.charAt(0).toUpperCase() + s.slice(1); }
+</script>
+</body>
+</html>

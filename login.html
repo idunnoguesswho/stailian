@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login · Stailian</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="stailian.css">
+</head>
+<body>
+
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">⚜ STAILIAN</div>
+    <div class="auth-sub">Enter the world</div>
+
+    <div id="flash"></div>
+    <div id="error-box"></div>
+
+    <form id="loginForm">
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label>Username</label>
+        <input type="text" id="username" name="username" required autofocus
+               autocomplete="username">
+      </div>
+      <div class="form-group" style="margin-bottom:1.5rem;">
+        <label>Password</label>
+        <input type="password" id="password" name="password" required
+               autocomplete="current-password">
+      </div>
+      <button class="btn btn-primary" type="submit" id="submitBtn"
+              style="width:100%;">
+        Enter the World →
+      </button>
+    </form>
+
+    <div style="text-align:center;margin-top:1rem;">
+      <a href="forgot.html"
+         style="font-size:.82rem;color:var(--muted);text-decoration:none;">
+        Forgot your password?
+      </a>
+    </div>
+
+    <hr style="border-color:var(--border);margin:1.5rem 0;">
+
+    <div style="text-align:center;">
+      <div style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem;">
+        New to Stailian?
+      </div>
+      <a href="register.html" class="btn btn-outline" style="width:100%;">
+        ⚜ Create an Account
+      </a>
+    </div>
+
+  </div>
+</div>
+
+<!-- Firebase compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+  // Redirect if already logged in
+  auth.onAuthStateChanged(u => { if (u) window.location.href = 'walk.html'; });
+
+  // Flash message from redirect
+  document.getElementById('flash').innerHTML = getFlash();
+
+  function showError(msg) {
+    document.getElementById('error-box').innerHTML =
+      `<div class="alert alert-error" style="margin-bottom:1.25rem;">${escHtml(msg)}</div>`;
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn      = document.getElementById('submitBtn');
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    btn.disabled    = true;
+    btn.textContent = 'Entering…';
+    document.getElementById('error-box').innerHTML = '';
+
+    try {
+      // Look up email by username
+      const email = await emailForUsername(username);
+      if (!email) {
+        showError('Invalid username or password.');
+        btn.disabled = false; btn.textContent = 'Enter the World →';
+        return;
+      }
+
+      await auth.signInWithEmailAndPassword(email, password);
+      window.location.href = 'walk.html';
+    } catch (err) {
+      const msgs = {
+        'auth/wrong-password':    'Invalid username or password.',
+        'auth/user-not-found':    'Invalid username or password.',
+        'auth/too-many-requests': 'Too many attempts. Please try again later.',
+        'auth/user-disabled':     'This account has been disabled.',
+      };
+      showError(msgs[err.code] ?? 'Login failed. Please try again.');
+      btn.disabled = false; btn.textContent = 'Enter the World →';
+    }
+  });
+</script>
+</body>
+</html>

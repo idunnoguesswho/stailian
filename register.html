@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create Account · Stailian</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="stailian.css">
+</head>
+<body>
+
+<div class="auth-wrap">
+  <div class="auth-card">
+    <div class="auth-logo">⚜ STAILIAN</div>
+    <div class="auth-sub">Create your account and enter the world</div>
+
+    <div id="error-box"></div>
+
+    <form id="regForm">
+
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label>Your Name</label>
+        <input type="text" id="name" required maxlength="100"
+               placeholder="e.g. Katie Snow">
+        <div class="field-hint">Your display name shown in the game</div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label>Username</label>
+        <input type="text" id="username" required maxlength="30"
+               pattern="[a-zA-Z0-9_]{3,30}"
+               placeholder="e.g. katie_snow"
+               oninput="checkUsername(this.value)">
+        <div id="usernameHint" class="field-hint">
+          3–30 characters, letters, numbers and underscores only
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label>Email Address</label>
+        <input type="email" id="email" required maxlength="100"
+               placeholder="e.g. katie@example.com">
+        <div class="field-hint">Used for password reset only</div>
+      </div>
+
+      <hr style="border-color:var(--border);margin:1.25rem 0;">
+
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label>Password</label>
+        <div style="position:relative;">
+          <input type="password" id="pw" required minlength="6"
+                 oninput="checkStrength(this.value);checkMatch();"
+                 style="padding-right:2.5rem;"
+                 placeholder="Min. 6 characters"
+                 autocomplete="new-password">
+          <button type="button" onclick="toggleVis('pw',this)"
+                  style="position:absolute;right:.6rem;top:50%;transform:translateY(-50%);
+                         background:none;border:none;cursor:pointer;
+                         color:var(--muted);font-size:.85rem;padding:0;">👁</button>
+        </div>
+        <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+        <div id="strengthLabel" style="font-size:.68rem;color:var(--muted);margin-top:.2rem;"></div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:1.5rem;">
+        <label>Confirm Password</label>
+        <div style="position:relative;">
+          <input type="password" id="pw2" required minlength="6"
+                 oninput="checkMatch()"
+                 style="padding-right:2.5rem;"
+                 placeholder="Repeat password"
+                 autocomplete="new-password">
+          <button type="button" onclick="toggleVis('pw2',this)"
+                  style="position:absolute;right:.6rem;top:50%;transform:translateY(-50%);
+                         background:none;border:none;cursor:pointer;
+                         color:var(--muted);font-size:.85rem;padding:0;">👁</button>
+        </div>
+        <div id="matchLabel" style="font-size:.68rem;margin-top:.2rem;"></div>
+      </div>
+
+      <button class="btn btn-primary" type="submit" id="submitBtn"
+              style="width:100%;font-size:.85rem;padding:.7rem;">
+        ⚜ Create Account & Enter the World
+      </button>
+    </form>
+
+    <div style="text-align:center;margin-top:1.25rem;font-size:.85rem;color:var(--muted);">
+      Already have an account?
+      <a href="login.html" style="color:var(--gold);text-decoration:none;">Sign in →</a>
+    </div>
+
+  </div>
+
+  <!-- Feature highlights -->
+  <div style="display:flex;gap:.75rem;flex-wrap:wrap;justify-content:center;max-width:440px;">
+    <div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;
+         color:var(--muted);background:var(--card);border:1px solid var(--border);
+         border-radius:var(--radius);padding:.4rem .7rem;flex:1;min-width:180px;">
+      <span style="font-size:1rem;flex-shrink:0;">🎲</span> Roll dice to explore a 10×10 elemental map
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;
+         color:var(--muted);background:var(--card);border:1px solid var(--border);
+         border-radius:var(--radius);padding:.4rem .7rem;flex:1;min-width:180px;">
+      <span style="font-size:1rem;flex-shrink:0;">⚔</span> Battle characters across terrain tiles
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;
+         color:var(--muted);background:var(--card);border:1px solid var(--border);
+         border-radius:var(--radius);padding:.4rem .7rem;flex:1;min-width:180px;">
+      <span style="font-size:1rem;flex-shrink:0;">👕</span> Craft dyes and colour your wardrobe
+    </div>
+    <div style="display:flex;align-items:center;gap:.5rem;font-size:.78rem;
+         color:var(--muted);background:var(--card);border:1px solid var(--border);
+         border-radius:var(--radius);padding:.4rem .7rem;flex:1;min-width:180px;">
+      <span style="font-size:1rem;flex-shrink:0;">❤</span> Manage your health and buy packs
+    </div>
+  </div>
+</div>
+
+<!-- Firebase compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+  auth.onAuthStateChanged(u => { if (u) window.location.href = 'walk.html'; });
+
+  function showError(msg) {
+    document.getElementById('error-box').innerHTML =
+      `<div class="alert alert-error" style="margin-bottom:1.25rem;">${escHtml(msg)}</div>`;
+  }
+
+  document.getElementById('regForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn      = document.getElementById('submitBtn');
+    const name     = document.getElementById('name').value.trim();
+    const username = document.getElementById('username').value.trim().toLowerCase();
+    const email    = document.getElementById('email').value.trim().toLowerCase();
+    const pw       = document.getElementById('pw').value;
+    const pw2      = document.getElementById('pw2').value;
+
+    // Client-side validation
+    if (!name)                                      return showError('Please enter your name.');
+    if (!/^[a-zA-Z0-9_]{3,30}$/.test(username))    return showError('Username must be 3–30 characters: letters, numbers, underscores only.');
+    if (!email || !/\S+@\S+\.\S+/.test(email))      return showError('Please enter a valid email address.');
+    if (pw.length < 6)                              return showError('Password must be at least 6 characters.');
+    if (pw !== pw2)                                 return showError('Passwords do not match.');
+
+    btn.disabled = true; btn.textContent = 'Creating…';
+    document.getElementById('error-box').innerHTML = '';
+
+    try {
+      // Check username is unique
+      const existing = await emailForUsername(username);
+      if (existing) {
+        showError(`Username '${escHtml(username)}' is already taken.`);
+        btn.disabled = false; btn.textContent = '⚜ Create Account & Enter the World';
+        return;
+      }
+
+      // Create Firebase Auth user
+      const cred = await auth.createUserWithEmailAndPassword(email, pw);
+      const uid  = cred.user.uid;
+
+      // Write to the public usernames lookup (allows login by username before auth)
+      await db.collection('usernames').doc(username).set({ uid, email });
+
+      // Create Firestore profile (consolidates users + user_coins + user_health + user_stats)
+      await db.collection('users').doc(uid).set({
+        name,
+        username,
+        email,
+        is_admin:       false,
+        coins:          0,
+        health:         100,
+        max_health:     100,
+        last_heal:      firebase.firestore.FieldValue.serverTimestamp(),
+        battles_fought: 0,
+        battles_won:    0,
+        position_x:     null,
+        position_y:     null,
+        layer:          'surface',
+        created_at:     firebase.firestore.FieldValue.serverTimestamp(),
+      });
+
+      window.location.href = 'walk.html?msg=' + encodeURIComponent(`Welcome to Stailian, ${name}!`) + '&type=success';
+    } catch (err) {
+      const msgs = {
+        'auth/email-already-in-use': 'An account with that email already exists.',
+        'auth/invalid-email':        'Please enter a valid email address.',
+        'auth/weak-password':        'Password is too weak. Use at least 6 characters.',
+      };
+      showError(msgs[err.code] ?? err.message);
+      btn.disabled = false; btn.textContent = '⚜ Create Account & Enter the World';
+    }
+  });
+
+  function toggleVis(id, btn) {
+    const el = document.getElementById(id);
+    el.type  = el.type === 'password' ? 'text' : 'password';
+    btn.textContent = el.type === 'password' ? '👁' : '🙈';
+  }
+  function checkUsername(val) {
+    const hint  = document.getElementById('usernameHint');
+    const valid = /^[a-zA-Z0-9_]{3,30}$/.test(val);
+    if (!val)       { hint.style.color='var(--muted)'; hint.textContent='3–30 characters, letters, numbers and underscores only'; }
+    else if (valid) { hint.style.color='var(--success)'; hint.textContent='✓ Username looks good'; }
+    else            { hint.style.color='var(--danger)'; hint.textContent='✗ Only letters, numbers and underscores (3–30 chars)'; }
+  }
+  function checkStrength(pw) {
+    const fill=document.getElementById('strengthFill'), label=document.getElementById('strengthLabel');
+    let s=0;
+    if(pw.length>=6)s++; if(pw.length>=10)s++; if(/[A-Z]/.test(pw))s++; if(/[0-9]/.test(pw))s++; if(/[^A-Za-z0-9]/.test(pw))s++;
+    const lvls=[{w:'10%',c:'var(--danger)',t:'Too short'},{w:'25%',c:'var(--danger)',t:'Weak'},{w:'50%',c:'var(--fire)',t:'Fair'},{w:'75%',c:'var(--gold)',t:'Good'},{w:'100%',c:'var(--success)',t:'Strong'}];
+    const l=lvls[Math.min(s,4)]; fill.style.width=l.w; fill.style.background=l.c; label.style.color=l.c; label.textContent=pw.length?l.t:'';
+  }
+  function checkMatch() {
+    const pw=document.getElementById('pw').value, pw2=document.getElementById('pw2').value, lbl=document.getElementById('matchLabel');
+    if(!pw2){lbl.textContent='';return;}
+    if(pw===pw2){lbl.style.color='var(--success)';lbl.textContent='✓ Passwords match';}
+    else{lbl.style.color='var(--danger)';lbl.textContent='✗ Passwords do not match';}
+  }
+</script>
+</body>
+</html>
