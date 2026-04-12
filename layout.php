@@ -56,73 +56,70 @@ function pageHeader(string $title, string $active = ''): void {
 </head>
 <body>
 <nav>
-  <a href="' . ($isLoggedIn ? 'walk.php' : 'login.php') . '" class="nav-brand">⚜ STAILIAN</a>';
+  <a href="' . ($isLoggedIn ? 'walk.php' : 'login.php') . '" class="nav-brand">⚜ STAILIAN</a>
+  <button class="nav-toggle" onclick="toggleNav()" aria-label="Menu">☰</button>
+  <div class="nav-links" id="navLinks">';
 
     foreach ($navItems as $item) {
         $cls = ($active === $item['url']) ? ' class="active"' : '';
         echo '<a href="' . htmlspecialchars($item['url']) . '"' . $cls . '>'
-            . $item['icon'] . ' '
-            . htmlspecialchars($item['label'])
-            . '</a>';
+            . $item['icon'] . ' ' . htmlspecialchars($item['label']) . '</a>';
     }
 
-    // Right side of nav — user info + admin badge
-    echo '<div style="margin-left:auto; display:flex; align-items:center; gap:.75rem;
-          padding:0 .5rem;">';
+    echo '</div>
+  <div class="nav-right" id="navRight">';
 
     if ($isLoggedIn) {
-		// Add this inside the right side of nav in pageHeader(), before the username link
-if ($isLoggedIn) {
-    try {
-        $dbNav   = getDB();
-        $hStmt   = $dbNav->prepare("SELECT health, max_health FROM user_health WHERE userid=?");
-        $hStmt->execute([$_SESSION['userid']]);
-        $hRow    = $hStmt->fetch();
-        if ($hRow) {
-            $hPct   = round(($hRow['health'] / $hRow['max_health']) * 100);
-            $hColor = $hPct > 60 ? '#27ae60' : ($hPct > 25 ? '#e8622a' : '#c0392b');
-            $hPulse = $hPct <= 25 ? 'animation:navpulse 1s infinite;' : '';
-            echo '
-            <style>
-              @keyframes navpulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-            </style>
-            <div style="display:flex; align-items:center; gap:.4rem;" title="'
-                .$hRow['health'].'/'.$hRow['max_health'].' HP">
-              <span style="font-size:.65rem; color:#c0392b;">❤</span>
-              <div style="width:60px; background:rgba(255,255,255,.1);
-                   border-radius:10px; height:6px; overflow:hidden;">
-                <div style="background:'.$hColor.'; width:'.$hPct.'%; height:100%;
-                     border-radius:10px; '.$hPulse.'"></div>
-              </div>
-              <span style="font-size:.65rem; color:'.$hColor.'; font-family:\'Cinzel\',serif;">
-                '.$hRow['health'].'
-              </span>
-            </div>';
-        }
-    } catch (Exception $e) {
-        // Health bar not available yet
-    }
-}
+        // Health bar
+        try {
+            $hStmt = getDB()->prepare("SELECT health, max_health FROM user_health WHERE userid=?");
+            $hStmt->execute([$_SESSION['userid']]);
+            $hRow  = $hStmt->fetch();
+            if ($hRow) {
+                $hPct   = round(($hRow['health'] / $hRow['max_health']) * 100);
+                $hColor = $hPct > 60 ? '#27ae60' : ($hPct > 25 ? '#e8622a' : '#c0392b');
+                $hPulse = $hPct <= 25 ? 'animation:navpulse 1s infinite;' : '';
+                echo '<style>@keyframes navpulse{0%,100%{opacity:1}50%{opacity:.4}}</style>
+                <div style="display:flex;align-items:center;gap:.4rem;"
+                     title="' . $hRow['health'] . '/' . $hRow['max_health'] . ' HP">
+                  <span style="font-size:.65rem;color:#c0392b;">❤</span>
+                  <div style="width:60px;background:rgba(255,255,255,.1);
+                       border-radius:10px;height:6px;overflow:hidden;">
+                    <div style="background:' . $hColor . ';width:' . $hPct . '%;height:100%;
+                         border-radius:10px;' . $hPulse . '"></div>
+                  </div>
+                  <span style="font-size:.65rem;color:' . $hColor . ';font-family:\'Cinzel\',serif;">'
+                    . $hRow['health'] . '</span>
+                </div>';
+            }
+        } catch (Exception $e) {}
+
         if ($isAdmin) {
-            echo '<span style="font-family:\'Cinzel\',serif; font-size:.6rem;
-                  letter-spacing:.1em; color:var(--gold); background:rgba(200,153,58,.15);
-                  border:1px solid var(--gold-dim); border-radius:20px; padding:.15rem .5rem;">
-                  ⚜ ADMIN</span>';
+            echo '<span style="font-family:\'Cinzel\',serif;font-size:.6rem;letter-spacing:.1em;
+                  color:var(--gold);background:rgba(200,153,58,.15);border:1px solid var(--gold-dim);
+                  border-radius:20px;padding:.15rem .5rem;">⚜ ADMIN</span>';
         }
-        echo '<a href="changepassword.php" style="font-size:.75rem; color:var(--muted);
-				  text-decoration:none; transition:color .15s;"
-				  onmouseenter="this.style.color=\'var(--gold)\'"
-				  onmouseleave="this.style.color=\'var(--muted)\'">
-				  👤 ' . htmlspecialchars($userName) . '</a>';
-        echo '<a href="logout.php" style="font-size:.7rem; color:var(--muted);
-              text-decoration:none; font-family:\'Cinzel\',serif; letter-spacing:.06em;"
+        echo '<a href="changepassword.php" style="font-size:.75rem;color:var(--muted);
+              text-decoration:none;" onmouseenter="this.style.color=\'var(--gold)\'"
+              onmouseleave="this.style.color=\'var(--muted)\'"
+              >👤 ' . htmlspecialchars($userName) . '</a>';
+        echo '<a href="logout.php" style="font-size:.7rem;color:var(--muted);text-decoration:none;
+              font-family:\'Cinzel\',serif;letter-spacing:.06em;"
               onmouseenter="this.style.color=\'var(--gold)\'"
-              onmouseleave="this.style.color=\'var(--muted)\'">
-              🚪 Logout</a>';
+              onmouseleave="this.style.color=\'var(--muted)\'">🚪 Logout</a>';
     }
 
-    echo '</div>';
-    echo '</nav><main>';
+    echo '</div>
+</nav>
+<script>
+function toggleNav() {
+    document.getElementById("navLinks").classList.toggle("open");
+    document.getElementById("navRight").classList.toggle("open");
+    var btn = document.querySelector(".nav-toggle");
+    btn.textContent = btn.textContent === "☰" ? "✕" : "☰";
+}
+</script>
+<main>';
 }
 
 function authHeader(string $title, string $subtitle = ''): void {
