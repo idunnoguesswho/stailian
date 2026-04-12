@@ -1,37 +1,11 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+if (session_status() === PHP_SESSION_NONE) session_start();
+require 'db.php';
+require 'layout.php';
 
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard · Stailian</title>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="stailian.css">
-</head>
-<h1 class="page-title">Game Database Dashboard</h1>
-<p class="page-sub">Manage all entities in the Stailian universe</p>
-<?php 
-	require 'db.php';
-	$db = getDB();
-	echo '<nav><a href="login.php" class="nav-brand">⚜ STAILIAN</a>';
-	echo '<ul class="nav-brand">'
-	foreach ($db->query("SELECT * FROM nav_menu WHERE is_active = 1 and admin_only = 0 ORDER BY sort_order ASC") as $r) {
-		echo '<a href="' . htmlspecialchars($r['url']) . '"' . $cls . '>'
-		. $r['icon'] . ' '
-		. htmlspecialchars($r['label'])
-		. '</a>';
-	}
-	echo '</ul></nav>';
-    
-
+pageHeader('Welcome', 'index.php');
 ?>
 
-
-<body>
 <h1 class="page-title">⚜ Welcome to Stailian</h1>
 <p class="page-sub">A world of elemental power, exploration, and craftsmanship</p>
 
@@ -120,7 +94,7 @@ ini_set('display_errors', 1);
       </div>
     </div>
 
-    <!-- THE BATTLE PAGE -->
+    <!-- BATTLE ARENA -->
     <div class="card">
       <div class="card-title">🏟 Battle Arena</div>
       <p style="font-size:.95rem; color:var(--text); line-height:1.8;">
@@ -140,40 +114,20 @@ ini_set('display_errors', 1);
     <div class="card">
       <div class="card-title">📚 Books, Flowers & Dyes</div>
       <div style="display:flex; flex-direction:column; gap:.6rem;">
-
+        <?php foreach ([
+          ['🌸','FLOWERS',  'Gathered automatically from every tile you land on. Max 120 flowers total. Each flower colour matches the tile type you landed on. 15 flowers of one colour convert into 1 book of that colour.'],
+          ['📚','BOOKS',    'Also gathered on every tile. Max 20 books total. Sell excess books for 🪙 1 coin each on the Books &amp; Flowers tab. Collect 5 books of the same colour to craft a dye.'],
+          ['⚗', 'DYES',    'Craft dyes on the Wardrobe → Craft tab. The shade level is determined by how many flowers of that colour you have — more flowers means a darker shade and a higher skill bonus. Shade 1 gives +2, shade 10 gives +20.'],
+        ] as [$icon, $label, $text]): ?>
         <div style="background:var(--surface); border-radius:var(--radius); padding:.7rem .9rem;">
           <div style="font-family:'Cinzel',serif; font-size:.78rem; color:var(--gold); margin-bottom:.3rem;">
-            🌸 FLOWERS
+            <?= $icon ?> <?= $label ?>
           </div>
           <p style="font-size:.88rem; color:var(--muted); line-height:1.7; margin:0;">
-            Gathered automatically from every tile you land on. Max 120 flowers total.
-            Each flower colour matches the tile type you landed on.
-            15 flowers of one colour convert into 1 book of that colour.
+            <?= $text ?>
           </p>
         </div>
-
-        <div style="background:var(--surface); border-radius:var(--radius); padding:.7rem .9rem;">
-          <div style="font-family:'Cinzel',serif; font-size:.78rem; color:var(--gold); margin-bottom:.3rem;">
-            📚 BOOKS
-          </div>
-          <p style="font-size:.88rem; color:var(--muted); line-height:1.7; margin:0;">
-            Also gathered on every tile. Max 20 books total. Sell excess books
-            for 🪙 1 coin each on the Books &amp; Flowers tab. Collect 5 books
-            of the same colour to craft a dye.
-          </p>
-        </div>
-
-        <div style="background:var(--surface); border-radius:var(--radius); padding:.7rem .9rem;">
-          <div style="font-family:'Cinzel',serif; font-size:.78rem; color:var(--gold); margin-bottom:.3rem;">
-            ⚗ DYES
-          </div>
-          <p style="font-size:.88rem; color:var(--muted); line-height:1.7; margin:0;">
-            Craft dyes on the Wardrobe → Craft tab. The shade level is determined
-            by how many flowers of that colour you have — more flowers means a
-            darker shade and a higher skill bonus. Shade 1 gives +2, shade 10 gives +20.
-          </p>
-        </div>
-
+        <?php endforeach; ?>
       </div>
     </div>
 
@@ -190,13 +144,11 @@ ini_set('display_errors', 1);
           ['👕','Shirt','Strongest shield — up to -15'],
           ['👖','Pants','Medium shield — up to -12'],
           ['🧦','Socks', 'Light shield — up to -8'],
-        ] as [$icon,$name,$desc]): ?>
+        ] as [$icon, $name, $desc]): ?>
         <div style="background:var(--surface); border-radius:var(--radius); padding:.6rem;
              text-align:center; border:1px solid var(--border);">
           <div style="font-size:1.6rem; margin-bottom:.25rem;"><?= $icon ?></div>
-          <div style="font-family:'Cinzel',serif; font-size:.72rem; color:var(--text);">
-            <?= $name ?>
-          </div>
+          <div style="font-family:'Cinzel',serif; font-size:.72rem; color:var(--text);"><?= $name ?></div>
           <div style="font-size:.68rem; color:var(--muted); margin-top:.15rem;"><?= $desc ?></div>
         </div>
         <?php endforeach; ?>
@@ -212,11 +164,11 @@ ini_set('display_errors', 1);
       <div class="card-title">🪙 Coins</div>
       <div style="display:flex; flex-direction:column; gap:.5rem;">
         <?php foreach ([
-          ['Sell a bowtie',    '🪙 10 coins', 'gold'],
-          ['Sell a book',      '🪙 1 coin',   'gold'],
+          ['Sell a bowtie',     '🪙 10 coins', 'gold'],
+          ['Sell a book',       '🪙 1 coin',   'gold'],
           ['Buy basic clothing','🪙 0–30 coins','muted'],
           ['Buy elder clothing','🪙 40–80 coins','muted'],
-        ] as [$action,$reward,$col]): ?>
+        ] as [$action, $reward, $col]): ?>
         <div style="display:flex; justify-content:space-between; align-items:center;
              padding:.5rem .75rem; background:var(--surface); border-radius:var(--radius);
              border:1px solid var(--border);">
@@ -234,19 +186,13 @@ ini_set('display_errors', 1);
       <div class="card-title">⚡ Quick Reference</div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:.4rem; font-size:.82rem;">
         <?php foreach ([
-          ['Max books',       '20'],
-          ['Max flowers',     '120'],
-          ['Max bowties',     '4'],
-          ['Books for dye',   '5'],
-          ['Flowers for book','15'],
-          ['Bowtie sell',     '🪙 10'],
-          ['Book sell',       '🪙 1'],
-          ['Shade levels',    '1–10'],
-          ['Dice',            '2× d12'],
-          ['Magic ground',    'X = Y'],
-          ['Map size',        '10×10'],
-          ['Elements',        '5'],
-        ] as [$label,$val]): ?>
+          ['Max books','20'],       ['Max flowers','120'],
+          ['Max bowties','4'],      ['Books for dye','5'],
+          ['Flowers for book','15'],['Bowtie sell','🪙 10'],
+          ['Book sell','🪙 1'],    ['Shade levels','1–10'],
+          ['Dice','2× d12'],        ['Magic ground','X = Y'],
+          ['Map size','10×10'],     ['Elements','5'],
+        ] as [$label, $val]): ?>
         <div style="display:flex; justify-content:space-between; padding:.35rem .6rem;
              background:var(--surface); border-radius:var(--radius); border:1px solid var(--border);">
           <span style="color:var(--muted);"><?= $label ?></span>
@@ -262,10 +208,15 @@ ini_set('display_errors', 1);
       <div style="font-family:'Cinzel',serif; font-size:1.1rem; color:var(--gold);
            margin-bottom:.75rem; letter-spacing:.05em;">Ready to Play?</div>
       <div style="display:flex; gap:.75rem; justify-content:center; flex-wrap:wrap;">
-        <a class="btn btn-primary" href="walk.php">🎲 Start Walking</a>
-        <a class="btn btn-outline" href="wardrobe.php">👕 Wardrobe</a>
-        <a class="btn btn-outline" href="battle.php">⚔ Battle Arena</a>
-        <a class="btn btn-outline" href="map.php">🗺 View Map</a>
+        <?php if (!empty($_SESSION['userid'])): ?>
+          <a class="btn btn-primary"  href="walk.php">🎲 Start Walking</a>
+          <a class="btn btn-outline"  href="wardrobe.php">👕 Wardrobe</a>
+          <a class="btn btn-outline"  href="battle.php">⚔ Battle Arena</a>
+          <a class="btn btn-outline"  href="map.php">🗺 View Map</a>
+        <?php else: ?>
+          <a class="btn btn-primary"  href="login.php">Sign In →</a>
+          <a class="btn btn-outline"  href="register.php">⚜ Create Account</a>
+        <?php endif; ?>
       </div>
     </div>
 
@@ -273,4 +224,3 @@ ini_set('display_errors', 1);
 </div>
 
 <?php pageFooter(); ?>
-
