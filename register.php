@@ -91,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+?>
 <?php authHeader('Create Account', 'Create your account and enter the world'); ?>
 
     <?php if ($error): ?>

@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Invalid username or password.';
     }
 }
+?>
 <?php authHeader('Login', 'Enter the world'); ?>
 
     <?php if ($error): ?>

@@ -48,6 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $valid) {
         header("Refresh: 2; url=walk.php");
     }
 }
+?>
 <?php authHeader('Reset Password', 'Reset your password'); ?>
 
     <?php if ($msg): ?>

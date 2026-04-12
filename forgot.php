@@ -51,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $msg = "If that email is registered, a reset link has been sent. Check your inbox.";
     }
 }
+?>
 <?php authHeader('Forgot Password', 'Forgot your password?'); ?>
 
     <?php if ($msg): ?>
