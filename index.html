@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stailian</title>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #0a0b0f;
+      --card:     #1a1d2a;
+      --border:   #2a2d3e;
+      --gold:     #c8993a;
+      --gold-dim: #8a6820;
+      --text:     #d8d0c0;
+      --muted:    #7a7060;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Crimson Pro", Georgia, serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+    }
+    body::before {
+      content: "";
+      position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+      opacity: 0.4;
+    }
+    .emblem {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      animation: glow 3s ease-in-out infinite;
+    }
+    @keyframes glow {
+      0%, 100% { text-shadow: 0 0 20px rgba(200,153,58,.3); }
+      50%       { text-shadow: 0 0 40px rgba(200,153,58,.7); }
+    }
+    h1 {
+      font-family: "Cinzel", serif;
+      font-weight: 900;
+      font-size: clamp(2.5rem, 8vw, 4.5rem);
+      color: var(--gold);
+      letter-spacing: .15em;
+      margin-bottom: .5rem;
+    }
+    .tagline {
+      font-style: italic;
+      color: var(--muted);
+      font-size: 1.1rem;
+      margin-bottom: 3rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2.5rem 3rem;
+      max-width: 480px;
+      width: 100%;
+    }
+    .card p {
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.7;
+      margin-bottom: 2rem;
+    }
+    .notice {
+      display: flex;
+      align-items: flex-start;
+      gap: .75rem;
+      background: rgba(200,153,58,.07);
+      border: 1px solid var(--gold-dim);
+      border-radius: 6px;
+      padding: 1rem 1.1rem;
+      text-align: left;
+      font-size: .9rem;
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .notice-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: .1rem; }
+    footer {
+      margin-top: 3rem;
+      font-family: "Cinzel", serif;
+      font-size: .7rem;
+      letter-spacing: .1em;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="emblem">⚜</div>
+  <h1>STAILIAN</h1>
+  <p class="tagline">An elemental world of exploration and strategy</p>
+
+  <div class="card">
+    <p>
+      Stailian is a private browser-based RPG. Roll dice to explore a 10×10 elemental map,
+      battle across terrain tiles, collect scrolls, craft dyes, and build your scorecard.
+    </p>
+    <div class="notice">
+      <span class="notice-icon">🔒</span>
+      <span>
+        This game runs on a private server and is available to invited players only.
+        If you have an account, ask your host for the <a href="index.php>server</a> address.
+      </span>
+    </div>
+  </div>
+
+  <footer>Stailian &mdash; idunnoguesswho</footer>
+
+</body>
+</html>
