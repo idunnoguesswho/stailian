@@ -47,7 +47,7 @@ pageHeader('Welcome', 'index.php');
              color:var(--gold); margin-bottom:.4rem;">EVERY ROLL</div>
         <ul style="font-size:.88rem; color:var(--muted); line-height:2; list-style:none; padding:0;">
           <li>🌸 You gather one flower from the tile's colour</li>
-          <li>📚 You pick up one book of that colour (max 20 total)</li>
+          <li>📚 You pick up one scroll of that colour (max 20 total)</li>
           <li>🧙 All characters roam to random tiles</li>
         </ul>
       </div>
@@ -110,13 +110,13 @@ pageHeader('Welcome', 'index.php');
   <!-- RIGHT COLUMN -->
   <div>
 
-    <!-- BOOKS FLOWERS DYES -->
+    <!-- SCROLLS FLOWERS DYES -->
     <div class="card">
-      <div class="card-title">📚 Books, Flowers & Dyes</div>
+      <div class="card-title">📚 Scrolls, Flowers & Dyes</div>
       <div style="display:flex; flex-direction:column; gap:.6rem;">
         <?php foreach ([
-          ['🌸','FLOWERS',  'Gathered automatically from every tile you land on. Max 120 flowers total. Each flower colour matches the tile type you landed on. 15 flowers of one colour convert into 1 book of that colour.'],
-          ['📚','BOOKS',    'Also gathered on every tile. Max 20 books total. Sell excess books for 🪙 1 coin each on the Books &amp; Flowers tab. Collect 5 books of the same colour to craft a dye.'],
+          ['🌸','FLOWERS',  'Gathered automatically from every tile you land on. Max 120 flowers total. Each flower colour matches the tile type you landed on. 15 flowers of one colour convert into 1 scroll of that colour.'],
+          ['📚','SCROLLS',    'Also gathered on every tile. Max 20 scrolls total. Sell excess scrolls for 🪙 1 coin each on the Scrolls &amp; Flowers tab. Collect 5 scrolls of the same colour to craft a dye.'],
           ['⚗', 'DYES',    'Craft dyes on the Wardrobe → Craft tab. The shade level is determined by how many flowers of that colour you have — more flowers means a darker shade and a higher skill bonus. Shade 1 gives +2, shade 10 gives +20.'],
         ] as [$icon, $label, $text]): ?>
         <div style="background:var(--surface); border-radius:var(--radius); padding:.7rem .9rem;">
@@ -165,7 +165,7 @@ pageHeader('Welcome', 'index.php');
       <div style="display:flex; flex-direction:column; gap:.5rem;">
         <?php foreach ([
           ['Sell a bowtie',     '🪙 10 coins', 'gold'],
-          ['Sell a book',       '🪙 1 coin',   'gold'],
+          ['Sell a scroll',       '🪙 1 coin',   'gold'],
           ['Buy basic clothing','🪙 0–30 coins','muted'],
           ['Buy elder clothing','🪙 40–80 coins','muted'],
         ] as [$action, $reward, $col]): ?>
@@ -186,10 +186,10 @@ pageHeader('Welcome', 'index.php');
       <div class="card-title">⚡ Quick Reference</div>
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:.4rem; font-size:.82rem;">
         <?php foreach ([
-          ['Max books','20'],       ['Max flowers','120'],
-          ['Max bowties','4'],      ['Books for dye','5'],
-          ['Flowers for book','15'],['Bowtie sell','🪙 10'],
-          ['Book sell','🪙 1'],    ['Shade levels','1–10'],
+          ['Max scrolls','20'],       ['Max flowers','120'],
+          ['Max bowties','4'],      ['Scrolls for dye','5'],
+          ['Flowers for scroll','15'],['Bowtie sell','🪙 10'],
+          ['Scroll sell','🪙 1'],    ['Shade levels','1–10'],
           ['Dice','2× d12'],        ['Magic ground','X = Y'],
           ['Map size','10×10'],     ['Elements','5'],
         ] as [$label, $val]): ?>

@@ -15,9 +15,9 @@ $tab    = $_GET['tab']    ?? 'wardrobe';
 
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const MAX_BOOKS   = 20;
+const MAX_SCROLLS   = 20;
 const MAX_FLOWERS = 120;
-const FLOWERS_PER_BOOK = 15;
+const FLOWERS_PER_SCROLL = 15;
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function getCoins(PDO $db, int $uid): int {
@@ -88,7 +88,7 @@ if ($act === 'sell_bowtie' && $userid) {
     }
 }
 
-// ── SELL BOOK ─────────────────────────────────────────────────────────────────
+// ── SELL SCROLL ───────────────────────────────────────────────────────────────
 if ($act === 'sell_scroll' && $userid && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $colour_id = (int)($_POST['colour_id'] ?? 0);
     $qty       = max(1, (int)($_POST['quantity'] ?? 1));
@@ -118,7 +118,7 @@ if ($act === 'sell_scroll' && $userid && $_SERVER['REQUEST_METHOD'] === 'POST') 
         "Sold {$qty} scroll(s) for 🪙 {$coins} coin(s)!");
 }
 
-// ── CONVERT FLOWERS TO BOOK ───────────────────────────────────────────────────
+// ── CONVERT FLOWERS TO SCROLL ─────────────────────────────────────────────────
 if ($act === 'flowers_to_scroll' && $userid && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $colour_id = (int)($_POST['colour_id'] ?? 0);
 
@@ -128,14 +128,14 @@ if ($act === 'flowers_to_scroll' && $userid && $_SERVER['REQUEST_METHOD'] === 'P
     $fStmt->execute([$userid, $colour_id]);
     $flowerQty = (int)($fStmt->fetchColumn() ?: 0);
 
-    if ($flowerQty < FLOWERS_PER_BOOK) {
+    if ($flowerQty < FLOWERS_PER_SCROLL) {
         redirect("wardrobe.php?tab=scrolls",
             "You need 15 flowers of this colour to convert to a scroll.", 'error');
     }
 
     // Check scroll limit
     $totalScrolls = getTotalScrolls($db, $userid);
-    if ($totalScrolls >= MAX_BOOKS) {
+    if ($totalScrolls >= MAX_SCROLLS) {
         redirect("wardrobe.php?tab=scrolls",
             "You already have the maximum 20 scrolls. Sell some first!", 'error');
     }
@@ -143,7 +143,7 @@ if ($act === 'flowers_to_scroll' && $userid && $_SERVER['REQUEST_METHOD'] === 'P
     // Deduct 15 flowers
     $db->prepare("UPDATE user_flowers SET quantity=quantity-?
         WHERE userid=? AND colour_id=?")
-       ->execute([FLOWERS_PER_BOOK, $userid, $colour_id]);
+       ->execute([FLOWERS_PER_SCROLL, $userid, $colour_id]);
 
     // Add 1 scroll
     $db->prepare("INSERT INTO user_scrolls (userid,colour_id,quantity) VALUES (?,?,1)
@@ -470,8 +470,8 @@ echo flash();
   <a class="btn btn-outline btn-sm" href="wardrobe.php">← All Users</a>
   <div style="margin-left:auto; display:flex; gap:1.25rem; align-items:center; flex-wrap:wrap;">
     <span style="font-family:'Cinzel',serif; color:var(--gold); font-size:1.1rem;">🪙 <?= $coins ?></span>
-    <span style="font-size:.85rem; color:<?= $totalScrolls >= MAX_BOOKS ? 'var(--danger)' : 'var(--muted)' ?>">
-      📚 <?= $totalScrolls ?>/<?= MAX_BOOKS ?>
+    <span style="font-size:.85rem; color:<?= $totalScrolls >= MAX_SCROLLS ? 'var(--danger)' : 'var(--muted)' ?>">
+      📚 <?= $totalScrolls ?>/<?= MAX_SCROLLS ?>
     </span>
     <span style="font-size:.85rem; color:<?= $totalFlowers >= MAX_FLOWERS ? 'var(--danger)' : 'var(--muted)' ?>">
       🌸 <?= $totalFlowers ?>/<?= MAX_FLOWERS ?>
@@ -483,9 +483,9 @@ echo flash();
 </div>
 
 <!-- LIMIT WARNINGS -->
-<?php if ($totalScrolls >= MAX_BOOKS): ?>
+<?php if ($totalScrolls >= MAX_SCROLLS): ?>
 <div class="alert alert-error">
-  📚 Book bag full (<?= MAX_BOOKS ?>/<?= MAX_BOOKS ?>)! Sell scrolls on the Scrolls tab to make room.
+  📜 Scroll bag full (<?= MAX_SCROLLS ?>/<?= MAX_SCROLLS ?>)! Sell scrolls on the Scrolls tab to make room.
 </div>
 <?php endif; ?>
 <?php if ($totalFlowers >= MAX_FLOWERS): ?>
@@ -684,9 +684,9 @@ echo flash();
       <?php endif; ?>
     </div>
 
-    <!-- BOOK PROGRESS -->
+    <!-- SCROLL PROGRESS -->
     <div class="card">
-      <div class="card-title">📚 Book Progress (<?= $totalScrolls ?>/<?= MAX_BOOKS ?>)</div>
+      <div class="card-title">📜 Scroll Progress (<?= $totalScrolls ?>/<?= MAX_SCROLLS ?>)</div>
       <div style="display:flex; flex-direction:column; gap:.45rem;">
         <?php foreach ($colours as $c):
           $qty  = $scrollMap[$c['id']] ?? 0;
@@ -885,22 +885,22 @@ $currentCoins = (int)$coinsStmt->fetchColumn();
 
 <?php elseif ($tab === 'scrolls'): ?>
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
-<!-- BOOKS & FLOWERS TAB                                                       -->
+<!-- SCROLLS & FLOWERS TAB                                                     -->
 <!-- ══════════════════════════════════════════════════════════════════════════ -->
 
 <div class="grid-2">
 
-  <!-- BOOKS -->
+  <!-- SCROLLS -->
   <div>
     <div class="card">
       <div class="card-title">
-        📚 Scrolls (<?= $totalScrolls ?>/<?= MAX_BOOKS ?>)
-        <?php if ($totalScrolls >= MAX_BOOKS): ?>
+        📚 Scrolls (<?= $totalScrolls ?>/<?= MAX_SCROLLS ?>)
+        <?php if ($totalScrolls >= MAX_SCROLLS): ?>
           <span style="color:var(--danger); font-size:.75rem;"> — FULL</span>
         <?php endif; ?>
       </div>
       <p style="font-size:.85rem; color:var(--muted); margin-bottom:1rem;">
-        5 scrolls = 1 dye. Max <?= MAX_BOOKS ?> scrolls total.
+        5 scrolls = 1 dye. Max <?= MAX_SCROLLS ?> scrolls total.
         Sell scrolls for 🪙 1 coin each when full.
       </p>
 
@@ -921,7 +921,7 @@ $currentCoins = (int)$coinsStmt->fetchColumn();
               ×<?= $b['quantity'] ?>
             </span>
           </div>
-          <!-- SELL BOOK FORM -->
+          <!-- SELL SCROLL FORM -->
           <form method="post"
                 action="wardrobe.php?tab=scrolls&action=sell_scroll"
                 style="display:flex; gap:.4rem; align-items:center; flex-wrap:wrap;">
@@ -970,8 +970,8 @@ $currentCoins = (int)$coinsStmt->fetchColumn();
       <div style="display:flex; flex-direction:column; gap:.5rem;">
         <?php foreach ($userFlowers as $f):
           if ($f['quantity'] <= 0) continue;
-          $canConvert  = $f['quantity'] >= FLOWERS_PER_BOOK && $totalScrolls < MAX_BOOKS;
-          $scrollsFull   = $totalScrolls >= MAX_BOOKS;
+          $canConvert  = $f['quantity'] >= FLOWERS_PER_SCROLL && $totalScrolls < MAX_SCROLLS;
+          $scrollsFull   = $totalScrolls >= MAX_SCROLLS;
         ?>
         <div style="padding:.5rem .6rem; background:var(--surface);
              border-radius:var(--radius); border:1px solid var(--border);">
@@ -990,15 +990,15 @@ $currentCoins = (int)$coinsStmt->fetchColumn();
           </div>
 
           <!-- FLOWER PROGRESS BAR -->
-          <?php $flowerPct = min(100, round(($f['quantity'] / FLOWERS_PER_BOOK) * 100)); ?>
+          <?php $flowerPct = min(100, round(($f['quantity'] / FLOWERS_PER_SCROLL) * 100)); ?>
           <div style="background:var(--border); border-radius:10px; height:4px;
                overflow:hidden; margin-bottom:.4rem;">
             <div style="background:<?= htmlspecialchars($f['hex_base']) ?>;
                  width:<?= $flowerPct ?>%; height:100%;"></div>
           </div>
           <div style="font-size:.68rem; color:var(--muted); margin-bottom:.4rem;">
-            <?= $f['quantity'] ?>/<?= FLOWERS_PER_BOOK ?> for next scroll conversion
-            <?php if ($f['quantity'] >= FLOWERS_PER_BOOK): ?>
+            <?= $f['quantity'] ?>/<?= FLOWERS_PER_SCROLL ?> for next scroll conversion
+            <?php if ($f['quantity'] >= FLOWERS_PER_SCROLL): ?>
               <span style="color:var(--success);">✓ Ready!</span>
             <?php endif; ?>
           </div>
@@ -1014,11 +1014,11 @@ $currentCoins = (int)$coinsStmt->fetchColumn();
           </form>
           <?php elseif ($scrollsFull): ?>
             <div style="font-size:.72rem; color:var(--danger);">
-              Book bag full — sell scrolls first
+              Scroll bag full — sell scrolls first
             </div>
           <?php else: ?>
             <div style="font-size:.72rem; color:var(--muted);">
-              Need <?= max(0, FLOWERS_PER_BOOK - $f['quantity']) ?> more flowers
+              Need <?= max(0, FLOWERS_PER_SCROLL - $f['quantity']) ?> more flowers
             </div>
           <?php endif; ?>
         </div>

@@ -693,11 +693,11 @@ $recentBattles->execute([$userRow['name'],$userid]);
 $recentBattles = $recentBattles->fetchAll();
 
 // Pie chart data
-$bookChartStmt = $db->prepare("SELECT c.name,c.hex_base,ub.quantity
+$scrollChartStmt = $db->prepare("SELECT c.name,c.hex_base,ub.quantity
     FROM user_scrolls ub JOIN colours c ON c.id=ub.colour_id
     WHERE ub.userid=? AND ub.quantity>0 ORDER BY ub.quantity DESC");
-$bookChartStmt->execute([$userid]);
-$bookChartData = $bookChartStmt->fetchAll();
+$scrollChartStmt->execute([$userid]);
+$scrollChartData = $scrollChartStmt->fetchAll();
 
 $flowerChartStmt = $db->prepare("SELECT c.name,c.hex_base,uf.quantity
     FROM user_flowers uf JOIN colours c ON c.id=uf.colour_id
@@ -705,7 +705,7 @@ $flowerChartStmt = $db->prepare("SELECT c.name,c.hex_base,uf.quantity
 $flowerChartStmt->execute([$userid]);
 $flowerChartData = $flowerChartStmt->fetchAll();
 
-$totalBC = array_sum(array_column($bookChartData,  'quantity'));
+$totalBC = array_sum(array_column($scrollChartData,  'quantity'));
 $totalFC = array_sum(array_column($flowerChartData,'quantity'));
 
 // Tower scrolls
@@ -1167,7 +1167,7 @@ echo flash();
       <?php if ($rollData['scrollGathered']): ?>
         <span style="font-size:.8rem;color:var(--text);">· 📜 Scroll</span>
       <?php endif; ?>
-      <a href="wardrobe.php?tab=books"
+      <a href="wardrobe.php?tab=scrolls"
          class="btn btn-outline btn-sm"
          style="margin-left:auto;font-size:.65rem;">
         View Scrolls
@@ -1545,22 +1545,22 @@ echo flash();
   </div>
 
   <!-- PIE CHARTS -->
-  <?php if ($bookChartData||$flowerChartData): ?>
+  <?php if ($scrollChartData||$flowerChartData): ?>
   <div class="card" style="margin-top:.75rem;padding:.75rem;">
     <div style="font-family:'Cinzel',serif;font-size:.65rem;letter-spacing:.08em;
          color:var(--gold);margin-bottom:.65rem;">📊 SCROLLS & FLOWERS</div>
     <div style="display:flex;gap:1rem;flex-wrap:wrap;
          justify-content:center;align-items:flex-start;">
 
-      <?php if ($bookChartData): ?>
+      <?php if ($scrollChartData): ?>
       <div style="text-align:center;">
         <div style="font-size:.6rem;color:var(--muted);margin-bottom:.25rem;">
           📜 Scrolls (<?= $totalBC ?>/30)
         </div>
-        <?= buildPie($bookChartData,$totalBC,70) ?>
+        <?= buildPie($scrollChartData,$totalBC,70) ?>
         <div style="display:flex;flex-wrap:wrap;gap:.15rem;justify-content:center;
              margin-top:.25rem;max-width:110px;">
-          <?php foreach ($bookChartData as $s): ?>
+          <?php foreach ($scrollChartData as $s): ?>
           <div style="display:flex;align-items:center;gap:.12rem;
                font-size:.48rem;color:var(--muted);">
             <div style="width:.4rem;height:.4rem;border-radius:1px;
