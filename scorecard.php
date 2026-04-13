@@ -43,7 +43,7 @@ foreach ($equipped->fetchAll() as $e) $equippedItems[$e['slot']] = $e;
 function getUserScoresFull(PDO $db, int $id): array {
     $totals = ['ice'=>0,'ground'=>0,'fire'=>0,'water'=>0,'dark'=>0];
     $s = $db->prepare("SELECT s.iceScore,s.groundScore,s.fireScore,s.waterScore,s.darkScore
-        FROM userAttributes ua JOIN skills s ON s.id=ua.skillid WHERE ua.userid=?");
+        FROM userattributes ua JOIN skills s ON s.id=ua.skillid WHERE ua.userid=?");
     $s->execute([$id]);
     foreach ($s->fetchAll() as $r) {
         foreach (['ice','ground','fire','water','dark'] as $el)
