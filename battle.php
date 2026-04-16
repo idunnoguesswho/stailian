@@ -7,75 +7,21 @@ require 'layout.php';
 $db = getDB();
 
 // ── FETCH ALL USERS AND CHARS FOR THE FORM ────────────────────────────────────
-$users = $db->query("SELECT id, name FROM users ORDER BY name")->fetchAll();
-$chars = $db->query("SELECT id, name FROM charbase ORDER BY name")->fetchAll();
+$users = $db->query("SELECT id, charname FROM characters where role='user' or role='admin' ORDER BY name")->fetchAll();
+$chars = $db->query("SELECT id, charname FROM characters where role='npc' ORDER BY name")->fetchAll();
 
 // ── CALCULATE SCORES HELPER ───────────────────────────────────────────────────
 function getUserScores(PDO $db, int $id): array {
     $totals = ['ice'=>0,'ground'=>0,'fire'=>0,'water'=>0,'dark'=>0];
 
     // Skills from userAttributes
-    $s = $db->prepare("SELECT s.iceScore,s.groundScore,s.fireScore,s.waterScore,s.darkScore
-        FROM userAttributes ua JOIN skills s ON s.id=ua.skillid WHERE ua.userid=?");
+    $s = $db->prepare("SELECT e.elementName, inv.score, inv.quantityOnHand FROM inventory inv inner join ... WHERE inv.userid=?");
     $s->execute([$id]);
     foreach ($s->fetchAll() as $r) {
         $totals['ice']    += $r['iceScore'];
-        $totals['ground'] += $r['groundScore'];
-        $totals['fire']   += $r['fireScore'];
-        $totals['water']  += $r['waterScore'];
-        $totals['dark']   += $r['darkScore'];
-    }
+        }
+        }
 
-    // Skills from weapon attributes via inventory
-    $w = $db->prepare("SELECT s.iceScore,s.groundScore,s.fireScore,s.waterScore,s.darkScore
-        FROM inventory i
-        JOIN weaponAttributes wa ON wa.weaponid=i.weaponid
-        JOIN skills s ON s.id=wa.skillid
-        WHERE i.userid=?");
-    $w->execute([$id]);
-    foreach ($w->fetchAll() as $r) {
-        $totals['ice']    += $r['iceScore'];
-        $totals['ground'] += $r['groundScore'];
-        $totals['fire']   += $r['fireScore'];
-        $totals['water']  += $r['waterScore'];
-        $totals['dark']   += $r['darkScore'];
-    }
-
-    return $totals;
-}
-
-function getCharScores(PDO $db, int $id): array {
-    $totals = ['ice'=>0,'ground'=>0,'fire'=>0,'water'=>0,'dark'=>0];
-
-    // Skills from charAttributes
-    $s = $db->prepare("SELECT s.iceScore,s.groundScore,s.fireScore,s.waterScore,s.darkScore
-        FROM charAttributes ca JOIN skills s ON s.id=ca.skillid WHERE ca.charid=?");
-    $s->execute([$id]);
-    foreach ($s->fetchAll() as $r) {
-        $totals['ice']    += $r['iceScore'];
-        $totals['ground'] += $r['groundScore'];
-        $totals['fire']   += $r['fireScore'];
-        $totals['water']  += $r['waterScore'];
-        $totals['dark']   += $r['darkScore'];
-    }
-
-    // Skills from weapon attributes via charinventory
-    $w = $db->prepare("SELECT s.iceScore,s.groundScore,s.fireScore,s.waterScore,s.darkScore
-        FROM charinventory ci
-        JOIN weaponAttributes wa ON wa.weaponid=ci.weaponid
-        JOIN skills s ON s.id=wa.skillid
-        WHERE ci.charid=?");
-    $w->execute([$id]);
-    foreach ($w->fetchAll() as $r) {
-        $totals['ice']    += $r['iceScore'];
-        $totals['ground'] += $r['groundScore'];
-        $totals['fire']   += $r['fireScore'];
-        $totals['water']  += $r['waterScore'];
-        $totals['dark']   += $r['darkScore'];
-    }
-
-    return $totals;
-}
 
 // ── PROCESS BATTLE ────────────────────────────────────────────────────────────
 $battle       = false;
