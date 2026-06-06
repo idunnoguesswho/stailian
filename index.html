@@ -6,69 +6,6 @@
 <title>Stailian</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="stailian.css">
-<style>
-  body { justify-content: center; }
-  .landing {
-    width: min(100%, 980px);
-    margin: 0 auto;
-    padding: 3rem 2rem;
-  }
-  .landing-top {
-    display: grid;
-    grid-template-columns: minmax(0, 1.1fr) minmax(280px, .9fr);
-    gap: 2rem;
-    align-items: center;
-  }
-  .brand-mark {
-    font-family: "Cinzel", serif;
-    font-size: clamp(2.7rem, 8vw, 5rem);
-    font-weight: 900;
-    color: var(--gold);
-    letter-spacing: .14em;
-    line-height: 1;
-    margin-bottom: .8rem;
-  }
-  .landing-copy {
-    color: var(--muted);
-    font-size: 1.12rem;
-    line-height: 1.75;
-    max-width: 620px;
-  }
-  .landing-actions {
-    display: flex;
-    gap: .75rem;
-    flex-wrap: wrap;
-    margin-top: 1.5rem;
-  }
-  .feature-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .75rem;
-    margin-top: 2rem;
-  }
-  .feature-list .card {
-    margin: 0;
-    padding: 1rem;
-  }
-  .feature-label {
-    font-family: "Cinzel", serif;
-    font-size: .78rem;
-    color: var(--gold);
-    letter-spacing: .08em;
-    margin-bottom: .35rem;
-  }
-  .feature-list p {
-    color: var(--muted);
-    font-size: .92rem;
-    line-height: 1.55;
-    margin: 0;
-  }
-  @media (max-width: 780px) {
-    .landing-top,
-    .feature-list { grid-template-columns: 1fr; }
-    .landing { padding: 2rem 1rem; }
-  }
-</style>
 </head>
 <body>
 <main class="landing">
