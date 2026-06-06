@@ -163,7 +163,13 @@
       const uid  = cred.user.uid;
 
       // Write to the public usernames lookup (allows login by username before auth)
-      await db.collection('usernames').doc(username).set({ uid, email });
+      let usernameLookupSaved = true;
+      try {
+        await db.collection('usernames').doc(username).set({ uid, email });
+      } catch (lookupErr) {
+        console.warn('Username lookup was not saved:', lookupErr);
+        usernameLookupSaved = false;
+      }
 
       // Create Firestore profile (consolidates users + user_coins + user_health + user_stats)
       await db.collection('users').doc(uid).set({
@@ -183,7 +189,10 @@
         created_at:     firebase.firestore.FieldValue.serverTimestamp(),
       });
 
-      window.location.href = 'walk.html?msg=' + encodeURIComponent(`Welcome to Stailian, ${name}!`) + '&type=success';
+      const welcomeMsg = usernameLookupSaved
+        ? `Welcome to Stailian, ${name}!`
+        : `Welcome to Stailian, ${name}! If username login is unavailable, sign in with your email address.`;
+      window.location.href = 'walk.html?msg=' + encodeURIComponent(welcomeMsg) + '&type=success';
     } catch (err) {
       const msgs = {
         'auth/email-already-in-use': 'An account with that email already exists.',

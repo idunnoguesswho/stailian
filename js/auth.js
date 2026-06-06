@@ -86,11 +86,16 @@ function escHtml(str) {
  * Returns null if not found.
  */
 async function emailForUsername(username) {
-  const snap = await db.collection('usernames')
-    .doc(username.toLowerCase().trim())
-    .get();
-  if (!snap.exists) return null;
-  return snap.data().email ?? null;
+  try {
+    const snap = await db.collection('usernames')
+      .doc(username.toLowerCase().trim())
+      .get();
+    if (!snap.exists) return null;
+    return snap.data().email ?? null;
+  } catch (err) {
+    console.warn('Username lookup failed:', err);
+    return null;
+  }
 }
 
 /**
