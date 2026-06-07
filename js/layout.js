@@ -95,21 +95,22 @@ function renderPageHeader(activePage, user) {
   document.getElementById('page-header').outerHTML = `
 <nav>
   <a href="${brandHref}" class="nav-brand">⚜ STAILIAN</a>
-  <button class="nav-toggle" onclick="toggleNav()" aria-label="Menu">☰</button>
+  <button class="nav-toggle" onclick="toggleNav()" aria-label="Menu" aria-expanded="false" type="button">Menu</button>
   <div class="nav-links" id="navLinks">${navLinks}</div>
   <div class="nav-right" id="navRight">${userLinks}</div>
 </nav>
-<script>
-function toggleNav() {
-  document.getElementById('navLinks').classList.toggle('open');
-  document.getElementById('navRight').classList.toggle('open');
-  var btn = document.querySelector('.nav-toggle');
-  btn.textContent = btn.textContent === '☰' ? '✕' : '☰';
-}
-<\/script>
 <main>`;
 }
-
+function toggleNav() {
+  const navLinks = document.getElementById('navLinks');
+  const navRight = document.getElementById('navRight');
+  const btn = document.querySelector('.nav-toggle');
+  if (!navLinks || !navRight || !btn) return;
+  const isOpen = navLinks.classList.toggle('open');
+  navRight.classList.toggle('open', isOpen);
+  btn.textContent = isOpen ? 'Close' : 'Menu';
+  btn.setAttribute('aria-expanded', String(isOpen));
+}
 /**
  * Inject the page footer. Place <div id="page-footer"></div> at end of body.
  */
@@ -135,7 +136,6 @@ function renderAuthHeader(subtitle) {
     <div class="auth-logo">⚜ STAILIAN</div>
     ${subtitle ? `<div class="auth-sub">${escHtml(subtitle)}</div>` : ''}`;
 }
-
 /**
  * Close the auth card. Place <div id="auth-footer"></div> at end of <body>.
  */
