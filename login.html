@@ -18,9 +18,8 @@
     <form id="loginForm">
       <div class="form-group form-gap-sm">
         <label>Character, Username, or Email</label>
-        <input type="text" id="identity" required autofocus list="character-options" autocomplete="username">
-        <datalist id="character-options"></datalist>
-        <div class="field-hint">This static version reads characters from the Google Sheet.</div>
+        <input type="text" id="identity" required autofocus autocomplete="username">
+        <div class="field-hint">Enter your character name or email.</div>
       </div>
 
       <div class="form-group form-gap-lg">
@@ -52,17 +51,10 @@ function showError(msg) {
     `<div class="alert alert-error form-message">${escHtml(msg)}</div>`;
 }
 
-function labelFor(c) {
-  return SheetDB.characterLabel(c);
-}
-
 async function boot() {
   try {
     await SheetDB.load();
     characters = SheetDB.table("characters");
-    document.getElementById("character-options").innerHTML = characters
-      .map(c => `<option value="${escHtml(labelFor(c))}"></option>`)
-      .join("");
   } catch (err) {
     showError(`Could not read the Google Sheet database. ${err.message}`);
   }
