@@ -155,14 +155,14 @@ function renderInventoryPanels() {
   const wearing = SheetDB.inventoryFor(currentUser.id).filter(row => row.wearing);
   document.getElementById("wearing-summary").innerHTML = wearing.length ? wearing.map(row => `
     <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(42,45,62,.5);padding:.25rem 0;">
-      <span>${escHtml(row.item.itemName || "Item " + row.itemId)}</span>
+      <span>${escHtml(SheetDB.itemDisplayName(row))}</span>
       <span style="color:var(--muted);">${escHtml(row.item.slot || "")}</span>
     </div>`).join("") : `<span style="color:var(--muted);">Nothing equipped.</span>`;
 
   const top = SheetDB.topInventory(currentUser.id, 5);
   document.getElementById("top-summary").innerHTML = top.length ? top.map(row => `
     <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(42,45,62,.5);padding:.25rem 0;">
-      <span>${escHtml(row.item.itemName || "Item " + row.itemId)}</span>
+      <span>${escHtml(SheetDB.itemDisplayName(row))}</span>
       <span style="color:var(--gold);">${money(row.item.basePrice)}</span>
     </div>`).join("") : `<span style="color:var(--muted);">No sellable inventory.</span>`;
 }

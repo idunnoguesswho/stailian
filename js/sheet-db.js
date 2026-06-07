@@ -45,6 +45,13 @@ function normText(value) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function canonicalId(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  const number = Number(text);
+  return Number.isFinite(number) && Number.isInteger(number) ? String(number) : text;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -82,7 +89,7 @@ const SheetDB = {
   },
 
   byId(name) {
-    return Object.fromEntries(this.table(name).map(row => [String(row.id), row]));
+    return Object.fromEntries(this.table(name).map(row => [canonicalId(row.id), row]));
   },
 
   findCharacterByIdentity(identity) {
@@ -265,6 +272,10 @@ const SheetDB = {
     return this.table("items").find(item => normText(item.itemName) === wanted) || null;
   },
 
+  itemDisplayName(row) {
+    return row?.item?.itemName || row?.itemName || "Unlinked inventory item";
+  },
+
   inventoryFor(userId) {
     return this.getInventoryRows(userId);
   },
@@ -276,12 +287,12 @@ const SheetDB = {
     const rowsByItem = new Map();
 
     this.table("inventory")
-      .filter(row => String(row.userId) === String(userId))
+      .filter(row => canonicalId(row.userId ?? row.userid) === canonicalId(userId))
       .forEach(row => {
-        const itemId = String(row.itemId || row.itemid || "");
+        const itemId = canonicalId(row.itemId ?? row.itemid);
         if (!itemId) return;
         const existing = rowsByItem.get(itemId) || {
-          userId: String(userId),
+          userId: canonicalId(userId),
           itemId,
           quantityOnHand: 0,
           wearing: 0
@@ -308,8 +319,16 @@ const SheetDB = {
 
     return Array.from(rowsByItem.values())
       .map(row => {
-        const item = items[String(row.itemId)] || {};
-        const element = elements[String(item.elementId)] || {};
+        const item = items[canonicalId(row.itemId)] || {
+          id: row.itemId,
+          itemName: row.itemName || "Unlinked inventory item",
+          slot: "",
+          basePrice: 0,
+          elementId: "",
+          elementMultiplier: 0,
+          missingItem: true
+        };
+        const element = elements[canonicalId(item.elementId)] || {};
         const slotInfo = slots[normText(item.slot)] || {};
         const qoh = toNumber(row.quantityOnHand);
         return {
@@ -385,7 +404,7 @@ const SheetDB = {
     const elements = this.byId("element");
     return this.table("map_tiles")
       .filter(row => toNumber(row.coordZ) === toNumber(z))
-      .map(row => ({ ...row, element: elements[String(row.elementId)] || {} }));
+      .map(row => ({ ...row, element: elements[canonicalId(row.elementId)] || {} }));
   },
 
   currentTileFor(user) {
@@ -395,7 +414,7 @@ const SheetDB = {
       toNumber(row.coordY) === toNumber(user.position_y ?? user.coordY) &&
       toNumber(row.coordZ) === toNumber(user.coordZ)
     );
-    return tile ? { ...tile, element: elements[String(tile.elementId)] || {} } : null;
+    return tile ? { ...tile, element: elements[canonicalId(tile.elementId)] || {} } : null;
   },
 
   recentRolls(userId, limit = 8) {
@@ -411,7 +430,7 @@ const SheetDB = {
   async addInventoryItemByName(userId, itemName, quantity = 1, wearing = 0) {
     const item = this.itemByName(itemName);
     if (!item) return { found: false, itemName };
-    const current = this.inventoryFor(userId).find(row => String(row.itemId) === String(item.id));
+    const current = this.inventoryFor(userId).find(row => canonicalId(row.itemId) === canonicalId(item.id));
     const nextQty = toNumber(current?.quantityOnHand) + toNumber(quantity, 1);
     const nextWearing = current ? toNumber(current.wearing) : toNumber(wearing);
     this.setInventoryLocal(userId, item.id, {
@@ -434,7 +453,7 @@ const SheetDB = {
 
   async setWearing(userId, itemId, shouldWear) {
     const rows = this.inventoryFor(userId);
-    const target = rows.find(row => String(row.itemId) === String(itemId));
+    const target = rows.find(row => canonicalId(row.itemId) === canonicalId(itemId));
     if (!target) return { ok: false, error: "Item not found" };
     const updates = [];
     if (shouldWear) {
@@ -462,7 +481,7 @@ const SheetDB = {
   },
 
   async sellItem(userId, itemId, quantity = 1) {
-    const row = this.inventoryFor(userId).find(inv => String(inv.itemId) === String(itemId));
+    const row = this.inventoryFor(userId).find(inv => canonicalId(inv.itemId) === canonicalId(itemId));
     if (!row || /coin/i.test(row.item.itemName || "")) return { ok: false, totalGold: 0 };
     const sellQty = Math.min(toNumber(quantity, 1), row.qoh);
     const nextQty = row.qoh - sellQty;
@@ -477,7 +496,7 @@ const SheetDB = {
       wearing: nextQty > 0 ? row.wearing : 0
     }];
     if (coinItem) {
-      const coinRow = this.inventoryFor(userId).find(inv => String(inv.itemId) === String(coinItem.id));
+      const coinRow = this.inventoryFor(userId).find(inv => canonicalId(inv.itemId) === canonicalId(coinItem.id));
       const nextCoins = toNumber(coinRow?.quantityOnHand) + totalGold;
       this.setInventoryLocal(userId, coinItem.id, { quantityOnHand: nextCoins, wearing: 0 });
       updates.push({
@@ -512,7 +531,7 @@ const SheetDB = {
       toNumber(row.coordY) === toNumber(coordY) &&
       toNumber(row.coordZ) === toNumber(coordZ)
     );
-    const element = tile ? (this.elementsById()[String(tile.elementId)] || {}) : {};
+    const element = tile ? (this.elementsById()[canonicalId(tile.elementId)] || {}) : {};
     const elementName = element.name || "";
     const drops = ["scroll", "flower", "dye", "flower", "flower", "flower", "flower", "flower", "scroll", "scroll"];
     const clothes = ["shirt", "socks", "pants", "shirt", "socks", "pants", "shirt", "socks", "pants", "bowtie"];

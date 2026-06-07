@@ -136,7 +136,7 @@ function rowHtml(row) {
   const item = row.item || {};
   return `
     <tr>
-      <td>${escHtml(item.itemName || "Item " + row.itemId)}</td>
+      <td>${escHtml(SheetDB.itemDisplayName(row))}</td>
       <td class="muted">${escHtml(row.slotInfo.icon_emoji || "")} ${escHtml(item.slot || "")}</td>
       <td>${escHtml(row.element.icon || "")} ${escHtml(row.element.name || "")}</td>
       <td class="num">${escHtml(row.qoh)}</td>

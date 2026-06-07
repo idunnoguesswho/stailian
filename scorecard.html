@@ -119,7 +119,7 @@ function renderWearing(user) {
   const rows = SheetDB.inventoryFor(user.id).filter(row => row.wearing);
   document.getElementById("wearing-list").innerHTML = rows.length ? rows.map(row => `
     <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(42,45,62,.5);padding:.3rem 0;">
-      <span>${escHtml(row.item.itemName || "Item " + row.itemId)}</span>
+      <span>${escHtml(SheetDB.itemDisplayName(row))}</span>
       <span style="color:var(--muted);">${escHtml(row.item.slot || "")}</span>
     </div>`).join("") : `<span style="color:var(--muted);">No inventory rows found.</span>`;
 }
