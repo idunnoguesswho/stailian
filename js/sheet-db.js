@@ -773,7 +773,7 @@ const SheetDB = {
     const element = tile?.element || (this.elementsById()[canonicalId(tile?.elementId)] || {});
     const elementName = element.name || "";
     const drops = ["scroll", "flower", "dye", "flower", "flower", "flower", "flower", "flower", "scroll", "scroll"];
-    const clothes = ["Shirt", "Socks", "Pants", "Shirt", "Socks", "Pants", "Shirt", "Socks", "Pants", "Bowtie"];
+    const clothingSlots = ["Shirt", "Socks", "Pants"];
     const rewards = [];
 
     if (elementName) {
@@ -781,13 +781,19 @@ const SheetDB = {
       const drop = await this.addInventoryItemByName(userId, dropName, 1, 0);
       if (drop.found) rewards.push(dropName);
     }
-    const shouldDropClothing = toNumber(coordX) === toNumber(coordY) || Math.random() < 0.3;
-    if (shouldDropClothing && elementName) {
-      const slotName = clothes[Math.floor(Math.random() * clothes.length)];
+    if (elementName) {
+      const slotName = clothingSlots[Math.floor(Math.random() * clothingSlots.length)];
       const clothingItem = this.itemForDrop(element.id, slotName);
       if (clothingItem) {
         const clothing = await this.addInventoryItem(userId, clothingItem, 1, 0);
         if (clothing.found) rewards.push(clothingItem.itemName);
+      }
+    }
+    if (toNumber(coordX) === toNumber(coordY) && elementName) {
+      const bowtie = this.itemForDrop(element.id, "Bowtie");
+      if (bowtie) {
+        const clothing = await this.addInventoryItem(userId, bowtie, 1, 0);
+        if (clothing.found) rewards.push(bowtie.itemName);
       }
     }
 
