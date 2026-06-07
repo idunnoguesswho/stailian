@@ -389,6 +389,10 @@ const SheetDB = {
     return this.table("items").find(item => /coin/i.test(item.itemName || "")) || null;
   },
 
+  isHealthItem(item) {
+    return /\bhealth\s+(pack|kit)\b/i.test(item?.itemName || "");
+  },
+
   inventoryValue(userId) {
     const rows = this.inventoryFor(userId);
     const itemValue = rows
@@ -570,6 +574,25 @@ const SheetDB = {
     return { sold: rows.length, totalGold };
   },
 
+  async consumeHealthInventory(userId) {
+    const healthRows = this.inventoryFor(userId).filter(row => this.isHealthItem(row.item));
+    if (!healthRows.length) return { consumed: 0, healed: false };
+
+    const updates = healthRows.map(row => {
+      this.setInventoryLocal(userId, row.itemId, { quantityOnHand: 0, wearing: 0 });
+      return {
+        userId: String(userId),
+        itemId: String(row.itemId),
+        quantityOnHand: 0,
+        wearing: 0
+      };
+    });
+    await this.write({ op: "batchUpsert", table: "inventory", rows: updates, keyFields: ["userId", "itemId"] });
+    const user = this.getCurrentCharacter();
+    if (user && toNumber(user.health) < 100) await this.setCharacterHealth(userId, 100);
+    return { consumed: healthRows.length, healed: !!user && toNumber(user.health) < 100 };
+  },
+
   async buyHealthPack(userId) {
     const user = this.getCurrentCharacter();
     if (!user) return { ok: false, error: "No active character." };
@@ -581,18 +604,24 @@ const SheetDB = {
     if (coins < 1000) return { ok: false, error: "You need 1000 coins for a health pack." };
 
     const nextCoins = coins - 1000;
+    const healthRows = this.inventoryFor(userId).filter(row => this.isHealthItem(row.item));
     this.setInventoryLocal(userId, coinItem.id, { quantityOnHand: nextCoins, wearing: 0 });
-    await this.write({
-      op: "upsert",
-      table: "inventory",
-      key: { userId: String(userId), itemId: String(coinItem.id) },
-      row: {
+    const updates = [{
         userId: String(userId),
         itemId: String(coinItem.id),
         quantityOnHand: nextCoins,
         wearing: 0
-      }
+    }];
+    healthRows.forEach(row => {
+      this.setInventoryLocal(userId, row.itemId, { quantityOnHand: 0, wearing: 0 });
+      updates.push({
+        userId: String(userId),
+        itemId: String(row.itemId),
+        quantityOnHand: 0,
+        wearing: 0
+      });
     });
+    await this.write({ op: "batchUpsert", table: "inventory", rows: updates, keyFields: ["userId", "itemId"] });
     await this.setCharacterHealth(userId, 100);
     return { ok: true, user: this.getCurrentCharacter(), coins: nextCoins, health: 100 };
   },
@@ -829,6 +858,7 @@ async function requireSheetUser(callback) {
     return;
   }
   await SheetDB.autoSellUnlinkedInventory(user.id);
+  await SheetDB.consumeHealthInventory(user.id);
   callback(SheetDB.getCurrentCharacter() || user);
 }
 

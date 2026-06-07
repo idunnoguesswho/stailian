@@ -120,7 +120,7 @@ function renderHealthPack() {
 }
 
 function renderFilters() {
-  const rows = SheetDB.inventoryFor(currentUser.id).filter(row => !/coin/i.test(row.item.itemName || ""));
+  const rows = SheetDB.inventoryFor(currentUser.id).filter(row => !/coin/i.test(row.item.itemName || "") && !SheetDB.isHealthItem(row.item));
   const slots = ["All", ...Array.from(new Set(rows.map(row => row.item.slot).filter(Boolean))).sort()];
   const elements = ["All", ...Array.from(new Set(rows.map(row => row.element.name).filter(Boolean))).sort()];
   document.getElementById("slot-filters").innerHTML = slots.map(slot => `
@@ -165,6 +165,7 @@ function rowHtml(row) {
 
 function renderOwned() {
   const rows = SheetDB.inventoryFor(currentUser.id)
+    .filter(row => !SheetDB.isHealthItem(row.item))
     .filter(row => activeSlot === "All" || row.item.slot === activeSlot)
     .filter(row => activeElement === "All" || row.element.name === activeElement);
 
@@ -209,6 +210,7 @@ async function buyHealthPack() {
 function renderShop() {
   const items = SheetDB.table("items")
     .filter(item => toNumber(item.isActive, 1) === 1)
+    .filter(item => !SheetDB.isHealthItem(item))
     .sort((a, b) => String(a.slot).localeCompare(String(b.slot)) || toNumber(a.basePrice) - toNumber(b.basePrice));
 
   document.getElementById("shop-list").innerHTML = `
