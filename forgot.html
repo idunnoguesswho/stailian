@@ -17,26 +17,24 @@
     <div id="msg-box"></div>
     <div id="form-wrap">
 
-      <p style="font-size:.9rem;color:var(--muted);margin-bottom:1.5rem;line-height:1.7;">
+      <p class="u-auth-copy">
         Enter the email address on your account and we'll send you a reset link.
-        The link expires after <strong style="color:var(--gold)">1 hour</strong>.
+        The link expires after <strong class="u-gold">1 hour</strong>.
       </p>
 
       <form id="forgotForm">
-        <div class="form-group" style="margin-bottom:1.25rem;">
+        <div class="form-group form-gap-md">
           <label>Email Address</label>
           <input type="email" id="email" required autofocus
                  placeholder="your@email.com">
         </div>
-        <button class="btn btn-primary" type="submit" id="submitBtn"
-                style="width:100%;">
+        <button class="btn btn-primary u-full" type="submit" id="submitBtn">
           Send Reset Link
         </button>
       </form>
 
-      <div style="text-align:center;margin-top:1.25rem;">
-        <a href="login.html"
-           style="font-size:.85rem;color:var(--muted);text-decoration:none;">
+      <div class="u-auth-return">
+        <a href="login.html">
           ← Back to Login
         </a>
       </div>
@@ -65,10 +63,10 @@
 
     // Always show the same message
     document.getElementById('form-wrap').innerHTML = `
-      <div class="alert alert-success" style="margin-bottom:1.25rem;">
+      <div class="alert alert-success form-message">
         If that email is registered, a reset link has been sent. Check your inbox.
       </div>
-      <div style="text-align:center;margin-top:1rem;">
+      <div class="u-auth-return-sm">
         <a href="login.html" class="btn btn-outline">← Back to Login</a>
       </div>`;
   });

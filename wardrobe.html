@@ -6,19 +6,6 @@
 <title>Wardrobe - Stailian</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="stailian.css">
-<style>
-  .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:1.5rem; flex-wrap:wrap; }
-  .tab-btn {
-    font-family:'Cinzel',serif; font-size:.7rem; letter-spacing:.08em;
-    padding:.65rem 1.1rem; color:var(--muted); background:none; border:none;
-    border-bottom:2px solid transparent; cursor:pointer; white-space:nowrap;
-  }
-  .tab-btn.active { color:var(--gold); border-bottom-color:var(--gold); }
-  .filter-row { display:flex; gap:.4rem; flex-wrap:wrap; margin:.7rem 0 1rem; }
-  .muted { color:var(--muted); }
-  .num { color:var(--gold); white-space:nowrap; }
-  .inventory-actions { display:flex; gap:.35rem; flex-wrap:wrap; }
-</style>
 </head>
 <body>
 <div id="page-header"></div>
@@ -47,7 +34,7 @@
   <div class="card-title">Owned Inventory</div>
   <div class="filter-row" id="slot-filters"></div>
   <div class="filter-row" id="element-filters"></div>
-  <div class="btn-row" style="margin:.5rem 0 1rem;">
+  <div class="btn-row inventory-sell-row">
     <button class="btn btn-danger btn-sm" onclick="sellAllFiltered()">Sell All (Not Wearing)</button>
   </div>
   <div class="tbl-wrap" id="owned-list">Loading...</div>
@@ -96,7 +83,7 @@ function renderAll() {
 function renderSummary() {
   const value = SheetDB.inventoryValue(currentUser.id);
   document.getElementById("inventory-value").innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
+    <div class="summary-grid-3">
       <div><div class="label">ITEMS</div><strong>${money(value.itemValue)}</strong></div>
       <div><div class="label">COINS</div><strong class="num">${money(value.coins)}</strong></div>
       <div><div class="label">TOTAL</div><strong class="num">${money(value.total)}</strong></div>
@@ -104,7 +91,7 @@ function renderSummary() {
 
   const score = SheetDB.battleScores(currentUser.id);
   document.getElementById("battle-score").innerHTML = `
-    <div style="font-family:'Cinzel',serif;font-size:1.4rem;color:var(--gold);">${score.total}</div>
+    <div class="score-total">${score.total}</div>
     <div class="muted">${score.byElement.slice(0, 5).map(row => `${escHtml(row.icon)} ${escHtml(row.element)} ${escHtml(row.score)}`).join(" | ") || "No battle items"}</div>`;
 }
 

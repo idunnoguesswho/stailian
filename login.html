@@ -16,27 +16,27 @@
     <div id="error-box"></div>
 
     <form id="loginForm">
-      <div class="form-group" style="margin-bottom:1rem;">
+      <div class="form-group form-gap-sm">
         <label>Character, Username, or Email</label>
         <input type="text" id="identity" required autofocus list="character-options" autocomplete="username">
         <datalist id="character-options"></datalist>
         <div class="field-hint">This static version reads characters from the Google Sheet.</div>
       </div>
 
-      <div class="form-group" style="margin-bottom:1.5rem;">
+      <div class="form-group form-gap-lg">
         <label>Password</label>
         <input type="password" id="password" required autocomplete="current-password">
         <div class="field-hint">Compared against the Sheet's password_hash field in the browser.</div>
       </div>
 
-      <button class="btn btn-primary" type="submit" id="submitBtn" style="width:100%;">
+      <button class="btn btn-primary u-full" type="submit" id="submitBtn">
         Enter the World
       </button>
     </form>
 
-    <hr style="border-color:var(--border);margin:1.5rem 0;">
+    <hr class="u-rule">
 
-    <div class="alert alert-success" style="font-size:.85rem;">
+    <div class="alert alert-success auth-note">
       Google Sheets is the database for this static build. Passwords are verified as hashes, but the Sheet data is still public to anyone with the database link.
     </div>
   </div>
@@ -49,7 +49,7 @@ let characters = [];
 
 function showError(msg) {
   document.getElementById("error-box").innerHTML =
-    `<div class="alert alert-error" style="margin-bottom:1.25rem;">${escHtml(msg)}</div>`;
+    `<div class="alert alert-error form-message">${escHtml(msg)}</div>`;
 }
 
 function labelFor(c) {

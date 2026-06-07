@@ -190,7 +190,7 @@ nav a.active { color: var(--gold); border-bottom-color: var(--gold); }
     letter-spacing: .1em;
     color: var(--gold-dim);
   }
-  input[type=text], input[type=email], input[type=number], select, textarea {
+  input[type=text], input[type=email], input[type=number], input[type=password], select, textarea {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -308,4 +308,154 @@ nav a.active { color: var(--gold); border-bottom-color: var(--gold); }
     border-radius: 4px;
     transition: width .3s, background .3s;
     width: 0%;
+  }
+
+  /* Shared utility and page component classes */
+  .u-center { text-align: center; }
+  .u-muted { color: var(--muted); }
+  .u-gold { color: var(--gold); }
+  .u-full { width: 100%; }
+  .u-link-muted {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .u-link-gold {
+    color: var(--gold);
+    text-decoration: none;
+  }
+  .u-auth-copy {
+    color: var(--muted);
+    font-size: .9rem;
+    line-height: 1.7;
+    margin-bottom: 1.5rem;
+  }
+  .u-auth-return {
+    text-align: center;
+    margin-top: 1.25rem;
+  }
+  .u-auth-return-sm {
+    text-align: center;
+    margin-top: 1rem;
+  }
+  .u-auth-return a {
+    color: var(--muted);
+    font-size: .85rem;
+    text-decoration: none;
+  }
+  .u-rule { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+  .form-gap-sm { margin-bottom: 1rem; }
+  .form-gap-md { margin-bottom: 1.25rem; }
+  .form-gap-lg { margin-bottom: 1.5rem; }
+  .auth-note { font-size: .85rem; }
+  .form-message { margin-bottom: 1.25rem; }
+  .field-meter-label {
+    color: var(--muted);
+    font-size: .68rem;
+    margin-top: .2rem;
+  }
+  .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .summary-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: .65rem; }
+  .summary-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
+  .list-row {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(42,45,62,.5);
+    padding: .3rem 0;
+  }
+  .list-row-tight {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(42,45,62,.5);
+    padding: .25rem 0;
+  }
+  .list-note {
+    color: var(--muted);
+    display: block;
+    font-size: .8rem;
+  }
+  .tile-heading { font-size: 1.35rem; }
+  .tile-meta {
+    color: var(--muted);
+    font-size: .9rem;
+    margin-top: .35rem;
+  }
+  .tile-description {
+    color: var(--muted);
+    font-size: .9rem;
+    margin-top: .65rem;
+  }
+  .score-total {
+    color: var(--gold);
+    font-family: "Cinzel", serif;
+    font-size: 1.4rem;
+  }
+  .character-summary {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .character-avatar {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    height: 82px;
+    object-fit: cover;
+    width: 82px;
+  }
+  .character-name {
+    color: var(--gold);
+    font-family: "Cinzel", serif;
+    font-size: 1.35rem;
+  }
+  .character-health { margin-top: .5rem; }
+  .character-description {
+    color: var(--muted);
+    margin-top: .75rem;
+  }
+  .dice-card { text-align: center; }
+  .dice-display {
+    font-size: 2.5rem;
+    letter-spacing: .3em;
+    margin-bottom: .5rem;
+    min-height: 3rem;
+  }
+  .tile-result {
+    color: var(--muted);
+    margin-bottom: 1rem;
+    min-height: 2rem;
+  }
+  .roll-btn {
+    font-size: .9rem;
+    padding: .65rem 2rem;
+  }
+  .is-hidden { display: none; }
+  .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:1.5rem; flex-wrap:wrap; }
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: "Cinzel", serif;
+    font-size: .7rem;
+    letter-spacing: .08em;
+    padding: .65rem 1.1rem;
+    white-space: nowrap;
+  }
+  .tab-btn.active { color: var(--gold); border-bottom-color: var(--gold); }
+  .filter-row { display:flex; gap:.4rem; flex-wrap:wrap; margin:.7rem 0 1rem; }
+  .num { color: var(--gold); white-space: nowrap; }
+  .inventory-actions { display:flex; gap:.35rem; flex-wrap:wrap; }
+  .inventory-sell-row { margin: .5rem 0 1rem; }
+  .logout-page {
+    align-items: center;
+    background: #0a0b0f;
+    color: #7a7060;
+    display: flex;
+    font-family: "Cinzel", serif;
+    justify-content: center;
+    min-height: 100vh;
+  }
+  .logout-message {
+    font-size: 1.1rem;
+    letter-spacing: .1em;
   }
