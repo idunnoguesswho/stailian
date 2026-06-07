@@ -24,7 +24,12 @@
 
       <div class="form-group form-gap-lg">
         <label>Password</label>
-        <input type="password" id="password" required autocomplete="current-password">
+        <div class="password-field">
+          <input type="password" id="password" required autocomplete="current-password">
+          <button class="password-toggle" type="button" id="passwordToggle" aria-controls="password" aria-label="Show password">
+            Show
+          </button>
+        </div>
         <div class="field-hint">Compared against the Sheet's password_hash field in the browser.</div>
       </div>
 
@@ -59,6 +64,15 @@ async function boot() {
     showError(`Could not read the Google Sheet database. ${err.message}`);
   }
 }
+
+document.getElementById("passwordToggle").addEventListener("click", () => {
+  const input = document.getElementById("password");
+  const toggle = document.getElementById("passwordToggle");
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  toggle.textContent = showing ? "Show" : "Hide";
+  toggle.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+});
 
 document.getElementById("loginForm").addEventListener("submit", async event => {
   event.preventDefault();

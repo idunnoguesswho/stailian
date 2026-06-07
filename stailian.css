@@ -353,6 +353,31 @@ nav a.active { color: var(--gold); border-bottom-color: var(--gold); }
     font-size: .68rem;
     margin-top: .2rem;
   }
+  .password-field {
+    position: relative;
+  }
+  .password-field input {
+    padding-right: 4.8rem;
+  }
+  .password-toggle {
+    background: transparent;
+    border: none;
+    color: var(--gold);
+    cursor: pointer;
+    font-family: "Cinzel", serif;
+    font-size: .68rem;
+    letter-spacing: .08em;
+    padding: .25rem .35rem;
+    position: absolute;
+    right: .55rem;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .password-toggle:hover,
+  .password-toggle:focus {
+    color: var(--text);
+    outline: none;
+  }
   .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
   .summary-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: .65rem; }
   .summary-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
