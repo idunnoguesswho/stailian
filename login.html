@@ -23,6 +23,12 @@
         <div class="field-hint">This static version reads characters from the Google Sheet.</div>
       </div>
 
+      <div class="form-group" style="margin-bottom:1.5rem;">
+        <label>Password</label>
+        <input type="password" id="password" required autocomplete="current-password">
+        <div class="field-hint">Compared against the Sheet's password_hash field in the browser.</div>
+      </div>
+
       <button class="btn btn-primary" type="submit" id="submitBtn" style="width:100%;">
         Enter the World
       </button>
@@ -31,11 +37,12 @@
     <hr style="border-color:var(--border);margin:1.5rem 0;">
 
     <div class="alert alert-success" style="font-size:.85rem;">
-      Google Sheets is the database for this static build. Password validation needs an Apps Script or server endpoint, so this page selects a character locally.
+      Google Sheets is the database for this static build. Passwords are verified as hashes, but the Sheet data is still public to anyone with the database link.
     </div>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
 <script src="js/sheet-db.js"></script>
 <script>
 let characters = [];
@@ -46,7 +53,7 @@ function showError(msg) {
 }
 
 function labelFor(c) {
-  return `${c.charName}${c.email ? " - " + c.email : ""}${c.role ? " (" + c.role + ")" : ""}`;
+  return SheetDB.characterLabel(c);
 }
 
 async function boot() {
@@ -61,23 +68,40 @@ async function boot() {
   }
 }
 
-document.getElementById("loginForm").addEventListener("submit", event => {
+document.getElementById("loginForm").addEventListener("submit", async event => {
   event.preventDefault();
+  const btn = document.getElementById("submitBtn");
   const identity = document.getElementById("identity").value.trim().toLowerCase();
-  const match = characters.find(c =>
-    String(c.id).toLowerCase() === identity ||
-    String(c.charName || "").toLowerCase() === identity ||
-    String(c.email || "").toLowerCase() === identity ||
-    labelFor(c).toLowerCase() === identity
-  );
+  const password = document.getElementById("password").value;
+  const match = SheetDB.findCharacterByIdentity(identity);
 
   if (!match) {
     showError("No matching character found in the Google Sheet.");
     return;
   }
 
-  SheetDB.setActiveCharacterId(match.id);
-  window.location.href = "walk.html";
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+  try {
+    const result = await SheetDB.verifyPassword(password, match.password_hash);
+    if (!result.ok) {
+      if (result.reason === "missing" && password === "password") {
+        await SheetDB.setCharacterPassword(match.id, password);
+      } else {
+        showError(result.reason === "missing"
+          ? "This character does not have a password hash yet. Use the default password once to initialize it."
+          : "Invalid username or password.");
+        return;
+      }
+    }
+    SheetDB.setActiveCharacterId(match.id);
+    window.location.href = "walk.html";
+  } catch (err) {
+    showError(`Could not verify password. ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Enter the World";
+  }
 });
 
 boot();

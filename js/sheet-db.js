@@ -85,6 +85,20 @@ const SheetDB = {
     return Object.fromEntries(this.table(name).map(row => [String(row.id), row]));
   },
 
+  findCharacterByIdentity(identity) {
+    const wanted = normText(identity);
+    return this.table("characters").find(character =>
+      normText(character.id) === wanted ||
+      normText(character.charName) === wanted ||
+      normText(character.email) === wanted ||
+      normText(this.characterLabel(character)) === wanted
+    ) || null;
+  },
+
+  characterLabel(character) {
+    return `${character.charName}${character.email ? " - " + character.email : ""}${character.role ? " (" + character.role + ")" : ""}`;
+  },
+
   async write(payload) {
     const body = { createdAt: nowIso(), ...payload };
     if (!SHEET_WRITE_WEBAPP_URL) {
@@ -125,6 +139,75 @@ const SheetDB = {
     all[key] = { ...(all[key] || {}), ...patch };
     localStorage.setItem("stailian_sheet_state", JSON.stringify(all));
     return all[key];
+  },
+
+  async hashPassword(password) {
+    if (window.dcodeIO?.bcrypt) {
+      return new Promise((resolve, reject) => {
+        window.dcodeIO.bcrypt.hash(password, 10, (err, hash) => err ? reject(err) : resolve(hash));
+      });
+    }
+    return `sha256$${await this.sha256(password)}`;
+  },
+
+  async sha256(value) {
+    const bytes = new TextEncoder().encode(value);
+    const digest = await crypto.subtle.digest("SHA-256", bytes);
+    return Array.from(new Uint8Array(digest)).map(byte => byte.toString(16).padStart(2, "0")).join("");
+  },
+
+  async verifyPassword(password, storedHash) {
+    const hash = String(storedHash || "").trim();
+    if (!hash) return { ok: false, reason: "missing" };
+    if (hash.startsWith("sha256$")) {
+      return { ok: `sha256$${await this.sha256(password)}` === hash, reason: "sha256" };
+    }
+    if (/^\$2[aby]\$/.test(hash) && window.dcodeIO?.bcrypt) {
+      const normalizedHash = hash.replace(/^\$2y\$/, "$2a$");
+      const ok = await new Promise(resolve => {
+        window.dcodeIO.bcrypt.compare(password, normalizedHash, (err, same) => resolve(!err && same));
+      });
+      return { ok, reason: "bcrypt" };
+    }
+    return { ok: false, reason: "unsupported" };
+  },
+
+  async setCharacterPassword(characterId, password) {
+    const password_hash = await this.hashPassword(password);
+    await this.write({
+      op: "update",
+      table: "characters",
+      key: { id: String(characterId) },
+      row: { id: String(characterId), password_hash }
+    });
+    return password_hash;
+  },
+
+  async createCharacter({ charName, email, password, role = "Player" }) {
+    const ids = this.table("characters").map(row => toNumber(row.id));
+    const id = Math.max(0, ...ids) + 1;
+    const createdAt = nowIso();
+    const row = {
+      id,
+      charName,
+      charDescription: "",
+      email,
+      password_hash: await this.hashPassword(password),
+      resetToken: "",
+      resetTokenExpires: "",
+      imagePath: "",
+      createdAt,
+      coordX: 0,
+      coordY: 0,
+      coordZ: 0,
+      placedAt: createdAt,
+      CurrentHealth: 100,
+      role
+    };
+    await this.append("characters", row);
+    if (this.cache?.characters) this.cache.characters.push(row);
+    this.setActiveCharacterId(id);
+    return row;
   },
 
   getInventoryOverlay() {

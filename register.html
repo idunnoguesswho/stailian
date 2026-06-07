@@ -13,18 +13,127 @@
     <div class="auth-logo">STAILIAN</div>
     <div class="auth-sub">Sheet database mode</div>
 
-    <div class="alert alert-success">
-      The static site now reads users and characters from the Google Sheet database.
+    <div id="message-box"></div>
+
+    <form id="registerForm">
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label>Character Name</label>
+        <input type="text" id="charName" required maxlength="100" autocomplete="username" autofocus>
+        <div class="field-hint">This becomes your login name.</div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label>Email Address</label>
+        <input type="email" id="email" maxlength="100" autocomplete="email">
+      </div>
+
+      <div class="form-group" style="margin-bottom:1rem;">
+        <label>Password</label>
+        <input type="password" id="password" required minlength="6" autocomplete="new-password" oninput="checkStrength(this.value); checkMatch();">
+        <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+        <div id="strengthLabel" style="font-size:.68rem;color:var(--muted);margin-top:.2rem;"></div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:1.5rem;">
+        <label>Confirm Password</label>
+        <input type="password" id="confirm" required minlength="6" autocomplete="new-password" oninput="checkMatch();">
+        <div id="matchLabel" style="font-size:.68rem;margin-top:.2rem;"></div>
+      </div>
+
+      <button class="btn btn-primary" type="submit" id="submitBtn" style="width:100%;justify-content:center;">
+        Create Account
+      </button>
+    </form>
+
+    <div style="text-align:center;margin-top:1rem;">
+      <a href="login.html" style="color:var(--gold);text-decoration:none;">Sign in</a>
     </div>
-
-    <p style="color:var(--muted);line-height:1.7;margin-bottom:1rem;">
-      To add a new player, add a row to the <strong>characters</strong> tab in the Google Sheet.
-      Browser-based registration can write there once an Apps Script write endpoint is configured in
-      <code>js/sheet-db.js</code>.
-    </p>
-
-    <a href="login.html" class="btn btn-primary" style="width:100%;justify-content:center;">Choose Character</a>
   </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+<script src="js/sheet-db.js"></script>
+<script>
+function showMessage(message, type = "error") {
+  document.getElementById("message-box").innerHTML =
+    `<div class="alert alert-${type}" style="margin-bottom:1.25rem;">${escHtml(message)}</div>`;
+}
+
+function checkStrength(pw) {
+  const fill = document.getElementById("strengthFill");
+  const label = document.getElementById("strengthLabel");
+  let score = 0;
+  if (pw.length >= 6) score++;
+  if (pw.length >= 10) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  const levels = [
+    { w: "10%", c: "var(--danger)", t: "Too short" },
+    { w: "25%", c: "var(--danger)", t: "Weak" },
+    { w: "50%", c: "var(--fire)", t: "Fair" },
+    { w: "75%", c: "var(--gold)", t: "Good" },
+    { w: "100%", c: "var(--success)", t: "Strong" }
+  ];
+  const level = levels[Math.min(score, 4)];
+  fill.style.width = pw ? level.w : "0";
+  fill.style.background = level.c;
+  label.style.color = level.c;
+  label.textContent = pw ? level.t : "";
+}
+
+function checkMatch() {
+  const pw = document.getElementById("password").value;
+  const confirm = document.getElementById("confirm").value;
+  const label = document.getElementById("matchLabel");
+  if (!confirm) {
+    label.textContent = "";
+    return;
+  }
+  label.style.color = pw === confirm ? "var(--success)" : "var(--danger)";
+  label.textContent = pw === confirm ? "Passwords match" : "Passwords do not match";
+}
+
+document.getElementById("registerForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const btn = document.getElementById("submitBtn");
+  const charName = document.getElementById("charName").value.trim();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
+  const confirm = document.getElementById("confirm").value;
+
+  if (password.length < 6) {
+    showMessage("Password must be at least 6 characters.");
+    return;
+  }
+  if (password !== confirm) {
+    showMessage("Passwords do not match.");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Creating...";
+  try {
+    await SheetDB.load();
+    const duplicate = SheetDB.table("characters").find(character =>
+      String(character.charName || "").toLowerCase() === charName.toLowerCase() ||
+      (email && String(character.email || "").toLowerCase() === email.toLowerCase())
+    );
+    if (duplicate) {
+      showMessage("That character name or email already exists.");
+      return;
+    }
+
+    const character = await SheetDB.createCharacter({ charName, email, password });
+    SheetDB.setActiveCharacterId(character.id);
+    window.location.href = "walk.html";
+  } catch (err) {
+    showMessage(`Could not create the account. ${err.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Create Account";
+  }
+});
+</script>
 </body>
 </html>
