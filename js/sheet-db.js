@@ -524,6 +524,71 @@ const SheetDB = {
     return { ok: true, totalGold };
   },
 
+  async useLayerScroll(userId, direction) {
+    const user = this.getCurrentCharacter();
+    if (!user) return { ok: false, error: "No active character." };
+
+    const step = direction === "climb" ? 1 : -1;
+    const currentZ = Math.max(-1, Math.min(1, toNumber(user.coordZ)));
+    const nextZ = currentZ + step;
+    if (nextZ < -1 || nextZ > 1) {
+      return { ok: false, error: "That layer is already the limit." };
+    }
+
+    const itemPattern = direction === "climb" ? /climbing scroll/i : /sliding scroll/i;
+    const scroll = this.inventoryFor(userId).find(row => itemPattern.test(row.item.itemName || ""));
+    if (!scroll || toNumber(scroll.qoh) < 1) {
+      return {
+        ok: false,
+        error: `You need a ${direction === "climb" ? "Climbing" : "Sliding"} Scroll to switch that way.`
+      };
+    }
+
+    const nextQty = toNumber(scroll.qoh) - 1;
+    const placedAt = nowIso();
+    this.setInventoryLocal(userId, scroll.itemId, {
+      quantityOnHand: nextQty,
+      wearing: 0
+    });
+    this.setLocalState(userId, {
+      coordX: toNumber(user.position_x),
+      coordY: toNumber(user.position_y),
+      coordZ: nextZ,
+      placedAt
+    });
+
+    await this.write({
+      op: "upsert",
+      table: "inventory",
+      key: { userId: String(userId), itemId: String(scroll.itemId) },
+      row: {
+        userId: String(userId),
+        itemId: String(scroll.itemId),
+        quantityOnHand: nextQty,
+        wearing: 0
+      }
+    });
+    await this.write({
+      op: "update",
+      table: "characters",
+      key: { id: String(userId) },
+      row: {
+        id: String(userId),
+        coordX: toNumber(user.position_x),
+        coordY: toNumber(user.position_y),
+        coordZ: nextZ,
+        placedAt
+      }
+    });
+
+    return {
+      ok: true,
+      user: this.getCurrentCharacter() || user,
+      itemName: scroll.item.itemName,
+      coordZ: nextZ
+    };
+  },
+
   async rollCharacter(userId, coordX, coordY, coordZ) {
     const user = this.getCurrentCharacter();
     const tile = this.table("map_tiles").find(row =>

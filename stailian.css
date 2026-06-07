@@ -381,6 +381,24 @@ nav a.active { color: var(--gold); border-bottom-color: var(--gold); }
     outline: none;
   }
   .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+  .layer-actions {
+    border-top: 1px solid var(--border);
+    margin-top: .9rem;
+    padding-top: .75rem;
+  }
+  .layer-action-title {
+    color: var(--muted);
+    font-family: "Cinzel", serif;
+    font-size: .62rem;
+    letter-spacing: .08em;
+    margin-bottom: .5rem;
+    text-transform: uppercase;
+  }
+  .layer-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
   .summary-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: .65rem; }
   .summary-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .75rem; }
   .list-row {

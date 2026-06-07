@@ -54,6 +54,7 @@
           <div id="layer-display"></div>
         </div>
       </div>
+      <div id="layer-actions" class="layer-actions"></div>
     </div>
 
     <div class="card">
@@ -109,12 +110,35 @@ function updateStatusDisplay() {
   document.getElementById("coins-display").textContent = `${currentUser.coins} coins`;
   document.getElementById("pos-display").textContent = `(${currentUser.position_x}, ${currentUser.position_y})`;
   document.getElementById("layer-display").textContent = layerName(currentUser.coordZ);
+  renderLayerActions();
 }
 
-function layerFromRoll(zRoll) {
-  if (zRoll <= 3) return -1;
-  if (zRoll <= 6) return 0;
-  return 1;
+function currentLayer() {
+  return Math.max(-1, Math.min(1, toNumber(currentUser.coordZ)));
+}
+
+function scrollInventory() {
+  return {
+    climbing: SheetDB.inventoryFor(currentUser.id).find(row => /climbing scroll/i.test(row.item.itemName || "")),
+    sliding: SheetDB.inventoryFor(currentUser.id).find(row => /sliding scroll/i.test(row.item.itemName || ""))
+  };
+}
+
+function renderLayerActions() {
+  const z = currentLayer();
+  const scrolls = scrollInventory();
+  const climbCount = toNumber(scrolls.climbing?.qoh);
+  const slideCount = toNumber(scrolls.sliding?.qoh);
+  document.getElementById("layer-actions").innerHTML = `
+    <div class="layer-action-title">Use a scroll to change layers</div>
+    <div class="layer-action-row">
+      <button class="btn btn-outline btn-sm" onclick="useLayerScroll('climb')" ${z >= 1 || climbCount < 1 ? "disabled" : ""}>
+        Climb (${climbCount})
+      </button>
+      <button class="btn btn-outline btn-sm" onclick="useLayerScroll('slide')" ${z <= -1 || slideCount < 1 ? "disabled" : ""}>
+        Slide (${slideCount})
+      </button>
+    </div>`;
 }
 
 function nearestTile(x, y, z) {
@@ -192,7 +216,7 @@ async function doRoll() {
   const x = Math.floor(Math.random() * 10) + 1;
   const y = Math.floor(Math.random() * 10) + 1;
   const zRoll = Math.floor(Math.random() * 10) + 1;
-  const z = layerFromRoll(zRoll);
+  const z = currentLayer();
   document.getElementById("dice-display").textContent = `${x} ${y} ${zRoll}`;
 
   const tile = nearestTile(x, y, z);
@@ -209,7 +233,7 @@ async function doRoll() {
   const writeResult = result.writeResult;
 
   document.getElementById("tile-result").innerHTML =
-    `Rolled (${x}, ${y}, ${zRoll}) -> ${layerName(z)} tile (${tile.coordX}, ${tile.coordY}, ${tile.coordZ})`;
+    `Rolled (${x}, ${y}, ${zRoll}) on ${layerName(z)} -> tile (${tile.coordX}, ${tile.coordY}, ${tile.coordZ})`;
   document.getElementById("outcome-card").classList.remove("is-hidden");
   document.getElementById("outcome-card").innerHTML = `
     <div class="card-title">${escHtml(tile.element?.name || "Tile Result")}</div>
@@ -224,6 +248,27 @@ async function doRoll() {
   renderRecentRolls();
   btn.disabled = false;
   btn.textContent = "Roll the Dice";
+}
+
+async function useLayerScroll(direction) {
+  const action = direction === "climb" ? "climb" : "slide";
+  const target = currentLayer() + (action === "climb" ? 1 : -1);
+  const buttons = document.querySelectorAll("#layer-actions button");
+  buttons.forEach(button => button.disabled = true);
+
+  const result = await SheetDB.useLayerScroll(currentUser.id, action);
+  if (!result.ok) {
+    document.getElementById("tile-result").textContent = result.error || "Could not switch layers.";
+    updateStatusDisplay();
+    return;
+  }
+
+  currentUser = result.user;
+  document.getElementById("tile-result").textContent = `Used a ${result.itemName} to move to ${layerName(target)}.`;
+  updateStatusDisplay();
+  renderCurrentTile();
+  renderInventoryPanels();
+  renderRecentRolls();
 }
 </script>
 </body>
