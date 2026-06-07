@@ -14,49 +14,48 @@
     border-bottom:2px solid transparent; cursor:pointer; white-space:nowrap;
   }
   .tab-btn.active { color:var(--gold); border-bottom-color:var(--gold); }
-  .tab-pane { display:none; }
-  .tab-pane.active { display:block; }
+  .filter-row { display:flex; gap:.4rem; flex-wrap:wrap; margin:.7rem 0 1rem; }
+  .muted { color:var(--muted); }
+  .num { color:var(--gold); white-space:nowrap; }
+  .inventory-actions { display:flex; gap:.35rem; flex-wrap:wrap; }
 </style>
 </head>
 <body>
 <div id="page-header"></div>
 
 <h1 class="page-title">Wardrobe</h1>
-<p class="page-sub">Inventory and shop data from Google Sheets.</p>
+<p class="page-sub">Inventory, wearing, selling, and shop data from Google Sheets.</p>
 
-<div class="tab-bar">
-  <button class="tab-btn active" onclick="switchTab('owned',this)">Owned Items</button>
-  <button class="tab-btn" onclick="switchTab('clothing',this)">Clothing</button>
-  <button class="tab-btn" onclick="switchTab('scrolls',this)">Scrolls</button>
-  <button class="tab-btn" onclick="switchTab('shop',this)">Shop Data</button>
+<div id="flash-zone"></div>
+
+<div class="grid-2">
+  <section>
+    <div class="card">
+      <div class="card-title">Inventory Value</div>
+      <div id="inventory-value">Loading...</div>
+    </div>
+  </section>
+  <section>
+    <div class="card">
+      <div class="card-title">Battle Score</div>
+      <div id="battle-score">Loading...</div>
+    </div>
+  </section>
 </div>
 
-<div class="tab-pane active" id="tab-owned">
-  <div class="card">
-    <div class="card-title">Owned Inventory</div>
-    <div id="owned-list">Loading...</div>
+<div class="card">
+  <div class="card-title">Owned Inventory</div>
+  <div class="filter-row" id="slot-filters"></div>
+  <div class="filter-row" id="element-filters"></div>
+  <div class="btn-row" style="margin:.5rem 0 1rem;">
+    <button class="btn btn-danger btn-sm" onclick="sellAllFiltered()">Sell All (Not Wearing)</button>
   </div>
+  <div class="tbl-wrap" id="owned-list">Loading...</div>
 </div>
 
-<div class="tab-pane" id="tab-clothing">
-  <div class="card">
-    <div class="card-title">Clothing</div>
-    <div id="clothing-list">Loading...</div>
-  </div>
-</div>
-
-<div class="tab-pane" id="tab-scrolls">
-  <div class="card">
-    <div class="card-title">Scrolls and Resources</div>
-    <div id="scrolls-list">Loading...</div>
-  </div>
-</div>
-
-<div class="tab-pane" id="tab-shop">
-  <div class="card">
-    <div class="card-title">Available Items</div>
-    <div id="shop-list">Loading...</div>
-  </div>
+<div class="card">
+  <div class="card-title">Available Items</div>
+  <div class="tbl-wrap" id="shop-list">Loading...</div>
 </div>
 
 <div id="page-footer"></div>
@@ -64,55 +63,123 @@
 <script src="js/sheet-db.js"></script>
 <script src="js/layout.js"></script>
 <script>
+let currentUser = null;
+let activeSlot = "All";
+let activeElement = "All";
+
 requireSheetUser(user => {
+  currentUser = user;
   renderPageHeader("wardrobe.html", user);
   renderPageFooter();
-  renderOwned(user);
+  renderAll();
   renderShop();
 });
 
-function switchTab(name, btn) {
-  document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-  document.getElementById("tab-" + name).classList.add("active");
-  btn.classList.add("active");
+function money(value) {
+  return `${toNumber(value)} coins`;
 }
 
-function itemElement(item) {
-  const element = SheetDB.byId("element")[String(item.elementId)] || {};
-  return element.name || "";
+function jsArg(value) {
+  return escHtml(JSON.stringify(String(value)));
+}
+
+function flash(message) {
+  document.getElementById("flash-zone").innerHTML = `<div class="alert alert-success">${escHtml(message)}</div>`;
+}
+
+function renderAll() {
+  renderSummary();
+  renderFilters();
+  renderOwned();
+}
+
+function renderSummary() {
+  const value = SheetDB.inventoryValue(currentUser.id);
+  document.getElementById("inventory-value").innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
+      <div><div class="label">ITEMS</div><strong>${money(value.itemValue)}</strong></div>
+      <div><div class="label">COINS</div><strong class="num">${money(value.coins)}</strong></div>
+      <div><div class="label">TOTAL</div><strong class="num">${money(value.total)}</strong></div>
+    </div>`;
+
+  const score = SheetDB.battleScores(currentUser.id);
+  document.getElementById("battle-score").innerHTML = `
+    <div style="font-family:'Cinzel',serif;font-size:1.4rem;color:var(--gold);">${score.total}</div>
+    <div class="muted">${score.byElement.slice(0, 5).map(row => `${escHtml(row.icon)} ${escHtml(row.element)} ${escHtml(row.score)}`).join(" | ") || "No battle items"}</div>`;
+}
+
+function renderFilters() {
+  const rows = SheetDB.inventoryFor(currentUser.id).filter(row => !/coin/i.test(row.item.itemName || ""));
+  const slots = ["All", ...Array.from(new Set(rows.map(row => row.item.slot).filter(Boolean))).sort()];
+  const elements = ["All", ...Array.from(new Set(rows.map(row => row.element.name).filter(Boolean))).sort()];
+  document.getElementById("slot-filters").innerHTML = slots.map(slot => `
+    <button class="tab-btn ${slot === activeSlot ? "active" : ""}" onclick="setSlotFilter(${jsArg(slot)})">
+      ${escHtml(slot)} (${slot === "All" ? rows.length : rows.filter(row => row.item.slot === slot).reduce((sum, row) => sum + row.qoh, 0)})
+    </button>`).join("");
+  document.getElementById("element-filters").innerHTML = elements.map(element => `
+    <button class="tab-btn ${element === activeElement ? "active" : ""}" onclick="setElementFilter(${jsArg(element)})">
+      ${escHtml(element)} (${element === "All" ? rows.length : rows.filter(row => row.element.name === element).reduce((sum, row) => sum + row.qoh, 0)})
+    </button>`).join("");
+}
+
+function setSlotFilter(slot) {
+  activeSlot = slot;
+  renderAll();
+}
+
+function setElementFilter(element) {
+  activeElement = element;
+  renderAll();
 }
 
 function rowHtml(row) {
-  const item = row.item || row;
-  const element = itemElement(item);
+  const item = row.item || {};
   return `
-    <div style="display:grid;grid-template-columns:1.5fr .7fr .6fr .6fr;gap:.75rem;border-bottom:1px solid rgba(42,45,62,.5);padding:.35rem 0;align-items:center;">
-      <span>${escHtml(item.itemName || "Item " + (row.itemId || item.id))}</span>
-      <span style="color:var(--muted);">${escHtml(item.slot || "")}</span>
-      <span style="color:var(--gold);">${escHtml(row.quantityOnHand ?? item.basePrice ?? "")}</span>
-      <span style="color:var(--muted);">${escHtml(element)}</span>
-    </div>`;
+    <tr>
+      <td>${escHtml(item.itemName || "Item " + row.itemId)}</td>
+      <td class="muted">${escHtml(row.slotInfo.icon_emoji || "")} ${escHtml(item.slot || "")}</td>
+      <td>${escHtml(row.element.icon || "")} ${escHtml(row.element.name || "")}</td>
+      <td class="num">${escHtml(row.qoh)}</td>
+      <td class="num">${money(row.baseValue)}</td>
+      <td class="num">${escHtml(row.battleScore)}</td>
+      <td>${row.wearing ? "Yes" : "No"}</td>
+      <td>
+        <div class="inventory-actions">
+          ${item.slot && !/coin/i.test(item.itemName || "") ? `<button class="btn btn-outline btn-sm" onclick="toggleWear(${jsArg(row.itemId)}, ${row.wearing ? "false" : "true"})">${row.wearing ? "Remove" : "Wear"}</button>` : ""}
+          ${!/coin/i.test(item.itemName || "") ? `<button class="btn btn-danger btn-sm" onclick="sellOne(${jsArg(row.itemId)})">Sell</button>` : ""}
+        </div>
+      </td>
+    </tr>`;
 }
 
-function renderOwned(user) {
-  const rows = SheetDB.inventoryFor(user.id);
-  const clothing = rows.filter(r => /shirt|pants|socks|clothing/i.test(r.item.slot || r.item.itemName || ""));
-  const scrolls = rows.filter(r => /scroll|coin|flower|dye|resource/i.test(r.item.slot || r.item.itemName || ""));
+function renderOwned() {
+  const rows = SheetDB.inventoryFor(currentUser.id)
+    .filter(row => activeSlot === "All" || row.item.slot === activeSlot)
+    .filter(row => activeElement === "All" || row.element.name === activeElement);
 
-  document.getElementById("owned-list").innerHTML = rows.length
-    ? `<div style="display:grid;grid-template-columns:1.5fr .7fr .6fr .6fr;gap:.75rem;color:var(--gold);font-family:'Cinzel',serif;font-size:.72rem;">
-         <span>Item</span><span>Slot</span><span>Qty</span><span>Element</span>
-       </div>${rows.map(rowHtml).join("")}`
-    : `<span style="color:var(--muted);">No inventory rows found for this character.</span>`;
+  document.getElementById("owned-list").innerHTML = rows.length ? `
+    <table>
+      <thead><tr><th>Item</th><th>Slot</th><th>Element</th><th>Qty</th><th>Value</th><th>Battle Score</th><th>Wearing</th><th>Sell</th></tr></thead>
+      <tbody>${rows.map(rowHtml).join("")}</tbody>
+    </table>` : `<span class="muted">No inventory rows found for this filter.</span>`;
+}
 
-  document.getElementById("clothing-list").innerHTML = clothing.length
-    ? clothing.map(rowHtml).join("")
-    : `<span style="color:var(--muted);">No clothing rows found.</span>`;
+async function toggleWear(itemId, shouldWear) {
+  await SheetDB.setWearing(currentUser.id, itemId, shouldWear);
+  flash(shouldWear ? "Item equipped." : "Item removed.");
+  renderAll();
+}
 
-  document.getElementById("scrolls-list").innerHTML = scrolls.length
-    ? scrolls.map(rowHtml).join("")
-    : `<span style="color:var(--muted);">No scroll/resource rows found.</span>`;
+async function sellOne(itemId) {
+  const result = await SheetDB.sellItem(currentUser.id, itemId, 1);
+  flash(`Sold for ${result.totalGold || 0} coins.`);
+  renderAll();
+}
+
+async function sellAllFiltered() {
+  const result = await SheetDB.sellAll(currentUser.id, activeSlot);
+  flash(`Sold not-wearing ${activeSlot === "All" ? "items" : activeSlot + " items"} for ${result.totalGold || 0} coins.`);
+  renderAll();
 }
 
 function renderShop() {
@@ -121,9 +188,19 @@ function renderShop() {
     .sort((a, b) => String(a.slot).localeCompare(String(b.slot)) || toNumber(a.basePrice) - toNumber(b.basePrice));
 
   document.getElementById("shop-list").innerHTML = `
-    <div style="display:grid;grid-template-columns:1.5fr .7fr .6fr .6fr;gap:.75rem;color:var(--gold);font-family:'Cinzel',serif;font-size:.72rem;">
-      <span>Item</span><span>Slot</span><span>Price</span><span>Element</span>
-    </div>${items.map(item => rowHtml(item)).join("")}`;
+    <table>
+      <thead><tr><th>Item</th><th>Slot</th><th>Element</th><th>Price</th><th>Battle Score</th></tr></thead>
+      <tbody>${items.map(item => {
+        const element = SheetDB.elementsById()[String(item.elementId)] || {};
+        return `<tr>
+          <td>${escHtml(item.itemName)}</td>
+          <td class="muted">${escHtml(item.slot || "")}</td>
+          <td>${escHtml(element.icon || "")} ${escHtml(element.name || "")}</td>
+          <td class="num">${money(item.basePrice)}</td>
+          <td class="num">${escHtml(item.elementMultiplier || 0)}</td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table>`;
 }
 </script>
 </body>

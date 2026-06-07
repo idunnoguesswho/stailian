@@ -18,6 +18,10 @@ const SHEET_TABLES = [
   "trait_definitions"
 ];
 
+const INVENTORY_OVERLAY_KEY = "stailian_sheet_inventory_overlay";
+const LOCAL_ROLLS_KEY = "stailian_local_rolls";
+const WRITE_QUEUE_KEY = "stailian_sheet_write_queue";
+
 function escHtml(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
@@ -35,6 +39,14 @@ function toNumber(value, fallback = 0) {
 
 function normalizeKey(key) {
   return String(key || "").trim();
+}
+
+function normText(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function nowIso() {
+  return new Date().toISOString();
 }
 
 const SheetDB = {
@@ -73,21 +85,25 @@ const SheetDB = {
     return Object.fromEntries(this.table(name).map(row => [String(row.id), row]));
   },
 
-  async append(table, row) {
-    const payload = { table, row, createdAt: new Date().toISOString() };
+  async write(payload) {
+    const body = { createdAt: nowIso(), ...payload };
     if (!SHEET_WRITE_WEBAPP_URL) {
-      const queued = JSON.parse(localStorage.getItem("stailian_sheet_write_queue") || "[]");
-      queued.push(payload);
-      localStorage.setItem("stailian_sheet_write_queue", JSON.stringify(queued));
+      const queued = JSON.parse(localStorage.getItem(WRITE_QUEUE_KEY) || "[]");
+      queued.push(body);
+      localStorage.setItem(WRITE_QUEUE_KEY, JSON.stringify(queued));
       return { queued: true };
     }
     await fetch(SHEET_WRITE_WEBAPP_URL, {
       method: "POST",
       mode: "no-cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(body)
     });
     return { sent: true };
+  },
+
+  async append(table, row) {
+    return this.write({ op: "append", table, row });
   },
 
   getActiveCharacterId() {
@@ -109,6 +125,26 @@ const SheetDB = {
     all[key] = { ...(all[key] || {}), ...patch };
     localStorage.setItem("stailian_sheet_state", JSON.stringify(all));
     return all[key];
+  },
+
+  getInventoryOverlay() {
+    return JSON.parse(localStorage.getItem(INVENTORY_OVERLAY_KEY) || "{}");
+  },
+
+  setInventoryOverlay(overlay) {
+    localStorage.setItem(INVENTORY_OVERLAY_KEY, JSON.stringify(overlay));
+  },
+
+  inventoryKey(userId, itemId) {
+    return `${String(userId)}:${String(itemId)}`;
+  },
+
+  setInventoryLocal(userId, itemId, patch) {
+    const overlay = this.getInventoryOverlay();
+    const key = this.inventoryKey(userId, itemId);
+    overlay[key] = { ...(overlay[key] || {}), ...patch };
+    this.setInventoryOverlay(overlay);
+    return overlay[key];
   },
 
   getCurrentCharacter() {
@@ -133,16 +169,126 @@ const SheetDB = {
     };
   },
 
+  elementsById() {
+    return this.byId("element");
+  },
+
+  slotsByName() {
+    return Object.fromEntries(this.table("slots").map(row => [normText(row.slot_name), row]));
+  },
+
+  itemByName(name) {
+    const wanted = normText(name);
+    return this.table("items").find(item => normText(item.itemName) === wanted) || null;
+  },
+
   inventoryFor(userId) {
+    return this.getInventoryRows(userId);
+  },
+
+  getInventoryRows(userId) {
     const items = this.byId("items");
-    return this.table("inventory")
-      .filter(row => String(row.userId) === String(userId) && toNumber(row.quantityOnHand) !== 0)
-      .map(row => ({ ...row, item: items[String(row.itemId)] || {} }));
+    const elements = this.elementsById();
+    const slots = this.slotsByName();
+    const rowsByItem = new Map();
+
+    this.table("inventory")
+      .filter(row => String(row.userId) === String(userId))
+      .forEach(row => {
+        const itemId = String(row.itemId || row.itemid || "");
+        if (!itemId) return;
+        const existing = rowsByItem.get(itemId) || {
+          userId: String(userId),
+          itemId,
+          quantityOnHand: 0,
+          wearing: 0
+        };
+        existing.quantityOnHand += toNumber(row.quantityOnHand);
+        existing.wearing = Math.max(toNumber(existing.wearing), toNumber(row.wearing));
+        rowsByItem.set(itemId, existing);
+      });
+
+    const overlay = this.getInventoryOverlay();
+    Object.entries(overlay).forEach(([key, value]) => {
+      const [overlayUserId, itemId] = key.split(":");
+      if (String(overlayUserId) !== String(userId)) return;
+      const existing = rowsByItem.get(itemId) || {
+        userId: String(userId),
+        itemId,
+        quantityOnHand: 0,
+        wearing: 0
+      };
+      if (value.quantityOnHand != null) existing.quantityOnHand = toNumber(value.quantityOnHand);
+      if (value.wearing != null) existing.wearing = toNumber(value.wearing);
+      rowsByItem.set(itemId, existing);
+    });
+
+    return Array.from(rowsByItem.values())
+      .map(row => {
+        const item = items[String(row.itemId)] || {};
+        const element = elements[String(item.elementId)] || {};
+        const slotInfo = slots[normText(item.slot)] || {};
+        const qoh = toNumber(row.quantityOnHand);
+        return {
+          ...row,
+          item,
+          element,
+          slotInfo,
+          quantityOnHand: qoh,
+          qoh,
+          wearing: toNumber(row.wearing),
+          baseValue: qoh * toNumber(item.basePrice),
+          battleScore: toNumber(item.elementMultiplier)
+        };
+      })
+      .filter(row => row.qoh > 0)
+      .sort((a, b) =>
+        String(a.item.slot || "").localeCompare(String(b.item.slot || "")) ||
+        String(a.element.name || "").localeCompare(String(b.element.name || "")) ||
+        String(a.item.itemName || "").localeCompare(String(b.item.itemName || ""))
+      );
   },
 
   inventoryCoins(userId) {
     const coin = this.inventoryFor(userId).find(row => /coin/i.test(row.item.itemName || ""));
     return coin ? toNumber(coin.quantityOnHand) : 0;
+  },
+
+  inventoryValue(userId) {
+    const rows = this.inventoryFor(userId);
+    const itemValue = rows
+      .filter(row => !/coin/i.test(row.item.itemName || ""))
+      .reduce((sum, row) => sum + row.baseValue, 0);
+    const coins = this.inventoryCoins(userId);
+    return { itemValue, coins, total: itemValue + coins };
+  },
+
+  battleScores(userId) {
+    const scores = new Map();
+    this.inventoryFor(userId)
+      .filter(row => !/coin/i.test(row.item.itemName || ""))
+      .forEach(row => {
+        const key = row.element.name || "Unaligned";
+        const existing = scores.get(key) || {
+          element: key,
+          icon: row.element.icon || "",
+          score: 0
+        };
+        existing.score += row.battleScore;
+        scores.set(key, existing);
+      });
+    const byElement = Array.from(scores.values()).sort((a, b) => b.score - a.score);
+    return {
+      total: byElement.reduce((sum, row) => sum + row.score, 0),
+      byElement
+    };
+  },
+
+  topInventory(userId, limit = 5) {
+    return this.inventoryFor(userId)
+      .filter(row => !/coin/i.test(row.item.itemName || ""))
+      .sort((a, b) => toNumber(b.item.basePrice) - toNumber(a.item.basePrice))
+      .slice(0, limit);
   },
 
   characterTraits(charId) {
@@ -159,12 +305,185 @@ const SheetDB = {
       .map(row => ({ ...row, element: elements[String(row.elementId)] || {} }));
   },
 
+  currentTileFor(user) {
+    const elements = this.elementsById();
+    const tile = this.table("map_tiles").find(row =>
+      toNumber(row.coordX) === toNumber(user.position_x ?? user.coordX) &&
+      toNumber(row.coordY) === toNumber(user.position_y ?? user.coordY) &&
+      toNumber(row.coordZ) === toNumber(user.coordZ)
+    );
+    return tile ? { ...tile, element: elements[String(tile.elementId)] || {} } : null;
+  },
+
   recentRolls(userId, limit = 8) {
-    return this.table("rolldata")
+    const local = JSON.parse(localStorage.getItem(LOCAL_ROLLS_KEY) || "[]")
+      .filter(row => String(row.userid) === String(userId));
+    const sheetRows = this.table("rolldata")
       .filter(row => String(row.userid) === String(userId))
       .slice()
-      .reverse()
-      .slice(0, limit);
+      .reverse();
+    return [...local.slice().reverse(), ...sheetRows].slice(0, limit);
+  },
+
+  async addInventoryItemByName(userId, itemName, quantity = 1, wearing = 0) {
+    const item = this.itemByName(itemName);
+    if (!item) return { found: false, itemName };
+    const current = this.inventoryFor(userId).find(row => String(row.itemId) === String(item.id));
+    const nextQty = toNumber(current?.quantityOnHand) + toNumber(quantity, 1);
+    const nextWearing = current ? toNumber(current.wearing) : toNumber(wearing);
+    this.setInventoryLocal(userId, item.id, {
+      quantityOnHand: nextQty,
+      wearing: nextWearing
+    });
+    await this.write({
+      op: "upsert",
+      table: "inventory",
+      key: { userId: String(userId), itemId: String(item.id) },
+      row: {
+        userId: String(userId),
+        itemId: String(item.id),
+        quantityOnHand: nextQty,
+        wearing: nextWearing
+      }
+    });
+    return { found: true, item, quantityOnHand: nextQty };
+  },
+
+  async setWearing(userId, itemId, shouldWear) {
+    const rows = this.inventoryFor(userId);
+    const target = rows.find(row => String(row.itemId) === String(itemId));
+    if (!target) return { ok: false, error: "Item not found" };
+    const updates = [];
+    if (shouldWear) {
+      rows
+        .filter(row => String(row.item.slot || "") === String(target.item.slot || "") && toNumber(row.wearing) === 1)
+        .forEach(row => {
+          this.setInventoryLocal(userId, row.itemId, { quantityOnHand: row.qoh, wearing: 0 });
+          updates.push({
+            userId: String(userId),
+            itemId: String(row.itemId),
+            quantityOnHand: row.qoh,
+            wearing: 0
+          });
+        });
+    }
+    this.setInventoryLocal(userId, itemId, { quantityOnHand: target.qoh, wearing: shouldWear ? 1 : 0 });
+    updates.push({
+      userId: String(userId),
+      itemId: String(itemId),
+      quantityOnHand: target.qoh,
+      wearing: shouldWear ? 1 : 0
+    });
+    await this.write({ op: "batchUpsert", table: "inventory", rows: updates, keyFields: ["userId", "itemId"] });
+    return { ok: true };
+  },
+
+  async sellItem(userId, itemId, quantity = 1) {
+    const row = this.inventoryFor(userId).find(inv => String(inv.itemId) === String(itemId));
+    if (!row || /coin/i.test(row.item.itemName || "")) return { ok: false, totalGold: 0 };
+    const sellQty = Math.min(toNumber(quantity, 1), row.qoh);
+    const nextQty = row.qoh - sellQty;
+    const totalGold = sellQty * toNumber(row.item.basePrice);
+    this.setInventoryLocal(userId, itemId, { quantityOnHand: nextQty, wearing: nextQty > 0 ? row.wearing : 0 });
+
+    const coinItem = this.table("items").find(item => /coin/i.test(item.itemName || ""));
+    const updates = [{
+      userId: String(userId),
+      itemId: String(itemId),
+      quantityOnHand: nextQty,
+      wearing: nextQty > 0 ? row.wearing : 0
+    }];
+    if (coinItem) {
+      const coinRow = this.inventoryFor(userId).find(inv => String(inv.itemId) === String(coinItem.id));
+      const nextCoins = toNumber(coinRow?.quantityOnHand) + totalGold;
+      this.setInventoryLocal(userId, coinItem.id, { quantityOnHand: nextCoins, wearing: 0 });
+      updates.push({
+        userId: String(userId),
+        itemId: String(coinItem.id),
+        quantityOnHand: nextCoins,
+        wearing: 0
+      });
+    }
+    await this.write({ op: "batchUpsert", table: "inventory", rows: updates, keyFields: ["userId", "itemId"] });
+    return { ok: true, totalGold };
+  },
+
+  async sellAll(userId, slotName = "All") {
+    const rows = this.inventoryFor(userId).filter(row =>
+      !/coin/i.test(row.item.itemName || "") &&
+      toNumber(row.wearing) !== 1 &&
+      (slotName === "All" || String(row.item.slot || "") === String(slotName))
+    );
+    let totalGold = 0;
+    for (const row of rows) {
+      const result = await this.sellItem(userId, row.itemId, row.qoh);
+      totalGold += result.totalGold || 0;
+    }
+    return { ok: true, totalGold };
+  },
+
+  async rollCharacter(userId, coordX, coordY, coordZ) {
+    const user = this.getCurrentCharacter();
+    const tile = this.table("map_tiles").find(row =>
+      toNumber(row.coordX) === toNumber(coordX) &&
+      toNumber(row.coordY) === toNumber(coordY) &&
+      toNumber(row.coordZ) === toNumber(coordZ)
+    );
+    const element = tile ? (this.elementsById()[String(tile.elementId)] || {}) : {};
+    const elementName = element.name || "";
+    const drops = ["scroll", "flower", "dye", "flower", "flower", "flower", "flower", "flower", "scroll", "scroll"];
+    const clothes = ["shirt", "socks", "pants", "shirt", "socks", "pants", "shirt", "socks", "pants", "bowtie"];
+    const rewards = [];
+
+    if (elementName) {
+      const dropName = `${elementName} ${drops[Math.floor(Math.random() * drops.length)]}`;
+      const drop = await this.addInventoryItemByName(userId, dropName, 1, 0);
+      if (drop.found) rewards.push(dropName);
+    }
+    if (toNumber(coordX) === toNumber(coordY) && elementName) {
+      const clothingName = `${elementName} ${clothes[Math.floor(Math.random() * clothes.length)]}`;
+      const clothing = await this.addInventoryItemByName(userId, clothingName, 1, 0);
+      if (clothing.found) rewards.push(clothingName);
+    }
+
+    this.setLocalState(userId, {
+      coordX: toNumber(coordX),
+      coordY: toNumber(coordY),
+      coordZ: toNumber(coordZ),
+      placedAt: nowIso()
+    });
+
+    await this.write({
+      op: "update",
+      table: "characters",
+      key: { id: String(userId) },
+      row: {
+        id: String(userId),
+        coordX: toNumber(coordX),
+        coordY: toNumber(coordY),
+        coordZ: toNumber(coordZ),
+        placedAt: nowIso()
+      }
+    });
+
+    const roll = {
+      x: toNumber(coordX),
+      y: toNumber(coordY),
+      z: toNumber(coordZ),
+      userid: String(userId),
+      rewards: rewards.join(", "),
+      rollTimeStamp: nowIso()
+    };
+    const local = JSON.parse(localStorage.getItem(LOCAL_ROLLS_KEY) || "[]");
+    local.push(roll);
+    localStorage.setItem(LOCAL_ROLLS_KEY, JSON.stringify(local));
+    const writeResult = await this.append("rolldata", roll);
+    return {
+      user: this.getCurrentCharacter() || user,
+      tile: tile ? { ...tile, element } : null,
+      rewards,
+      writeResult
+    };
   }
 };
 

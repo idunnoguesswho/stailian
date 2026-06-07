@@ -56,8 +56,18 @@
     </div>
 
     <div class="card">
-      <div class="card-title">Inventory</div>
-      <div id="inventory-summary">Loading...</div>
+      <div class="card-title">Inventory Value</div>
+      <div id="inventory-value">Loading...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Wearing</div>
+      <div id="wearing-summary">Loading...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Top 5</div>
+      <div id="top-summary">Loading...</div>
     </div>
 
     <div class="card">
@@ -82,7 +92,7 @@ requireSheetUser(user => {
   mapTiles = SheetDB.mapTilesForZ(currentUser.coordZ || 0);
   updateStatusDisplay();
   renderCurrentTile();
-  renderInventory();
+  renderInventoryPanels();
   renderRecentRolls();
 });
 
@@ -111,10 +121,7 @@ function nearestTile(x, y) {
 }
 
 function renderCurrentTile(tile = null) {
-  tile = tile || mapTiles.find(t =>
-    toNumber(t.coordX) === toNumber(currentUser.position_x) &&
-    toNumber(t.coordY) === toNumber(currentUser.position_y)
-  );
+  tile = tile || SheetDB.currentTileFor(currentUser);
   if (!tile) {
     document.getElementById("tile-info").innerHTML = "No tile found for this position.";
     return;
@@ -130,24 +137,38 @@ function renderCurrentTile(tile = null) {
     <p style="margin-top:.65rem;color:var(--muted);font-size:.9rem;">${escHtml(el.description || "")}</p>`;
 }
 
-function renderInventory() {
-  const rows = SheetDB.inventoryFor(currentUser.id);
-  if (!rows.length) {
-    document.getElementById("inventory-summary").innerHTML = `<span style="color:var(--muted);">No inventory rows for this character.</span>`;
-    return;
-  }
-  document.getElementById("inventory-summary").innerHTML = rows.slice(0, 16).map(row => `
+function money(value) {
+  return `${toNumber(value)} coins`;
+}
+
+function renderInventoryPanels() {
+  const value = SheetDB.inventoryValue(currentUser.id);
+  const score = SheetDB.battleScores(currentUser.id);
+  document.getElementById("inventory-value").innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.65rem;">
+      <div><div class="label">ITEMS</div><strong>${money(value.itemValue)}</strong></div>
+      <div><div class="label">COINS</div><strong style="color:var(--gold);">${money(value.coins)}</strong></div>
+      <div><div class="label">TOTAL</div><strong style="color:var(--gold);">${money(value.total)}</strong></div>
+      <div><div class="label">BATTLE</div><strong style="color:var(--gold);">${score.total}</strong></div>
+    </div>`;
+
+  const wearing = SheetDB.inventoryFor(currentUser.id).filter(row => row.wearing);
+  document.getElementById("wearing-summary").innerHTML = wearing.length ? wearing.map(row => `
     <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(42,45,62,.5);padding:.25rem 0;">
       <span>${escHtml(row.item.itemName || "Item " + row.itemId)}</span>
-      <span style="color:var(--gold);">${escHtml(row.quantityOnHand)}</span>
-    </div>`).join("");
+      <span style="color:var(--muted);">${escHtml(row.item.slot || "")}</span>
+    </div>`).join("") : `<span style="color:var(--muted);">Nothing equipped.</span>`;
+
+  const top = SheetDB.topInventory(currentUser.id, 5);
+  document.getElementById("top-summary").innerHTML = top.length ? top.map(row => `
+    <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(42,45,62,.5);padding:.25rem 0;">
+      <span>${escHtml(row.item.itemName || "Item " + row.itemId)}</span>
+      <span style="color:var(--gold);">${money(row.item.basePrice)}</span>
+    </div>`).join("") : `<span style="color:var(--muted);">No sellable inventory.</span>`;
 }
 
 function renderRecentRolls() {
-  const local = JSON.parse(localStorage.getItem("stailian_local_rolls") || "[]")
-    .filter(r => String(r.userid) === String(currentUser.id));
-  const sheetRows = SheetDB.recentRolls(currentUser.id);
-  const rows = [...local.slice().reverse(), ...sheetRows].slice(0, 10);
+  const rows = SheetDB.recentRolls(currentUser.id, 10);
   document.getElementById("move-trail").innerHTML = rows.length ? rows.map(r => `
     <div style="border-bottom:1px solid rgba(42,45,62,.5);padding:.25rem 0;">
       (${escHtml(r.x)}, ${escHtml(r.y)}, ${escHtml(r.z)}) - ${escHtml(r.rewards || "none")}
@@ -172,27 +193,10 @@ async function doRoll() {
     return;
   }
 
-  const rewards = tile.element?.resource || "none";
-  SheetDB.setLocalState(currentUser.id, {
-    coordX: toNumber(tile.coordX),
-    coordY: toNumber(tile.coordY),
-    coordZ: toNumber(tile.coordZ)
-  });
-  currentUser = SheetDB.getCurrentCharacter();
-
-  const roll = {
-    x: toNumber(tile.coordX),
-    y: toNumber(tile.coordY),
-    z: toNumber(tile.coordZ),
-    userid: currentUser.id,
-    rewards,
-    rollTimeStamp: new Date().toISOString()
-  };
-
-  const local = JSON.parse(localStorage.getItem("stailian_local_rolls") || "[]");
-  local.push(roll);
-  localStorage.setItem("stailian_local_rolls", JSON.stringify(local));
-  const writeResult = await SheetDB.append("rolldata", roll);
+  const result = await SheetDB.rollCharacter(currentUser.id, tile.coordX, tile.coordY, tile.coordZ);
+  currentUser = result.user;
+  const rewards = result.rewards.length ? result.rewards.join(", ") : "none";
+  const writeResult = result.writeResult;
 
   document.getElementById("tile-result").innerHTML =
     `Rolled (${x}, ${y}) -> nearest Sheet tile (${tile.coordX}, ${tile.coordY})`;
@@ -201,11 +205,12 @@ async function doRoll() {
     <div class="card-title">${escHtml(tile.element?.name || "Tile Result")}</div>
     <p style="color:var(--muted);">Gathered: <strong>${escHtml(rewards)}</strong></p>
     <p style="color:var(--muted);font-size:.85rem;">
-      ${writeResult.queued ? "Write queued locally. Add an Apps Script write endpoint to send rolls into the Sheet." : "Write sent to Google Sheets endpoint."}
+      ${writeResult.queued ? "Write queued locally. Add an Apps Script write endpoint to send rolls and inventory updates into the Sheet." : "Write sent to Google Sheets endpoint."}
     </p>`;
 
   updateStatusDisplay();
   renderCurrentTile(tile);
+  renderInventoryPanels();
   renderRecentRolls();
   btn.disabled = false;
   btn.textContent = "Roll the Dice";

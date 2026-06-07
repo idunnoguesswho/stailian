@@ -28,8 +28,18 @@
 
   <section>
     <div class="card">
-      <div class="card-title">Inventory</div>
-      <div id="inventory-list">Loading...</div>
+      <div class="card-title">Inventory Value</div>
+      <div id="inventory-value">Loading...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Battle Score</div>
+      <div id="battle-score">Loading...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Wearing</div>
+      <div id="wearing-list">Loading...</div>
     </div>
 
     <div class="card">
@@ -54,7 +64,8 @@ requireSheetUser(user => {
   renderPageFooter();
   renderCharacter(user);
   renderTraits(user);
-  renderInventory(user);
+  renderInventorySummary(user);
+  renderWearing(user);
   renderRolls(user);
   renderBattles(user);
 });
@@ -82,19 +93,39 @@ function renderTraits(user) {
     </div>`).join("") : `<span style="color:var(--muted);">No traits found.</span>`;
 }
 
-function renderInventory(user) {
-  const rows = SheetDB.inventoryFor(user.id);
-  document.getElementById("inventory-list").innerHTML = rows.length ? rows.map(row => `
+function money(value) {
+  return `${toNumber(value)} coins`;
+}
+
+function renderInventorySummary(user) {
+  const value = SheetDB.inventoryValue(user.id);
+  const score = SheetDB.battleScores(user.id);
+  document.getElementById("inventory-value").innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;">
+      <div><div class="label">ITEMS</div><strong>${money(value.itemValue)}</strong></div>
+      <div><div class="label">COINS</div><strong style="color:var(--gold);">${money(value.coins)}</strong></div>
+      <div><div class="label">TOTAL</div><strong style="color:var(--gold);">${money(value.total)}</strong></div>
+    </div>`;
+  document.getElementById("battle-score").innerHTML = `
+    <div style="font-family:'Cinzel',serif;font-size:1.4rem;color:var(--gold);">${score.total}</div>
+    ${score.byElement.length ? score.byElement.map(row => `
+      <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(42,45,62,.5);padding:.25rem 0;">
+        <span>${escHtml(row.icon || "")} ${escHtml(row.element)}</span>
+        <strong style="color:var(--gold);">${escHtml(row.score)}</strong>
+      </div>`).join("") : `<span style="color:var(--muted);">No battle items found.</span>`}`;
+}
+
+function renderWearing(user) {
+  const rows = SheetDB.inventoryFor(user.id).filter(row => row.wearing);
+  document.getElementById("wearing-list").innerHTML = rows.length ? rows.map(row => `
     <div style="display:flex;justify-content:space-between;border-bottom:1px solid rgba(42,45,62,.5);padding:.3rem 0;">
       <span>${escHtml(row.item.itemName || "Item " + row.itemId)}</span>
-      <span style="color:var(--gold);">${escHtml(row.quantityOnHand)}</span>
+      <span style="color:var(--muted);">${escHtml(row.item.slot || "")}</span>
     </div>`).join("") : `<span style="color:var(--muted);">No inventory rows found.</span>`;
 }
 
 function renderRolls(user) {
-  const local = JSON.parse(localStorage.getItem("stailian_local_rolls") || "[]")
-    .filter(r => String(r.userid) === String(user.id));
-  const rows = [...local.slice().reverse(), ...SheetDB.recentRolls(user.id, 10)].slice(0, 12);
+  const rows = SheetDB.recentRolls(user.id, 12);
   document.getElementById("rolls-list").innerHTML = rows.length ? rows.map(r => `
     <div style="border-bottom:1px solid rgba(42,45,62,.5);padding:.3rem 0;">
       (${escHtml(r.x)}, ${escHtml(r.y)}, ${escHtml(r.z)}) - ${escHtml(r.rewards || "none")}
