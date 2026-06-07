@@ -19,12 +19,8 @@ pageHeader('Welcome', 'index.php');
       <div class="card-title">🗺 The World</div>
       <p style="font-size:.95rem; color:var(--text); line-height:1.8; margin-bottom:.75rem;">
         Stailian is a 10×10 tile map of elemental terrain. Each tile belongs to one of
-        twelve colour families — Volcano, Tundra, Forest, River, and more — each tied to
-        a core element: <span class="badge badge-fire">🔥 Fire</span>
-        <span class="badge badge-ice">❄ Ice</span>
-        <span class="badge badge-water">💧 Water</span>
-        <span class="badge badge-ground">🌍 Ground</span>
-        <span class="badge badge-dark">🌑 Dark</span>.
+        element families — Volcano, Tundra, Forest, River, and more — each tied to
+        a core element. The map is also 3 layers high, including sky, ground and underworld.
       </p>
       <p style="font-size:.95rem; color:var(--text); line-height:1.8;">
         The map is reshuffled at any time using the Randomize button, keeping every game
@@ -38,7 +34,7 @@ pageHeader('Welcome', 'index.php');
       <div class="card-title">🎲 Walking & Moving</div>
       <p style="font-size:.95rem; color:var(--text); line-height:1.8; margin-bottom:.75rem;">
         On the <strong style="color:var(--gold)">Walk</strong> screen, select your user
-        and roll two 12-sided dice. Die 1 sets your X coordinate, Die 2 sets your Y.
+        and roll two 10-sided dice. Die 1 sets your X coordinate, Die 2 sets your Y.
         You land on the nearest tile to those coordinates.
       </p>
       <div style="background:var(--surface); border-radius:var(--radius); padding:.75rem 1rem;

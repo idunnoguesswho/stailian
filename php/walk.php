@@ -4,7 +4,7 @@ ini_set('display_errors', 1);
 require 'auth.php';
 require 'db.php';
 require 'health.php';
-require 'clock.php';
+//require 'clock.php';
 require 'layout.php';
 
 $db     = getDB();
@@ -17,12 +17,7 @@ const MAX_FLOWERS = 120;
 const MAX_BOWTIES = 4;
 
 // ── FETCH SIGNED IN USER + THEIR CHARACTER ────────────────────────────────────
-$userRow = $db->prepare("SELECT u.*, COALESCE(uc.coins,0) as coins,
-    cb.id as charid, cb.name as charname, cb.chardescription
-    FROM users u
-    LEFT JOIN user_coins uc ON uc.userid=u.id
-    LEFT JOIN charbase cb ON cb.id=u.charid
-    WHERE u.id=?");
+$userRow = $db->prepare("SELECT * FROM Characters Where id=?");
 $userRow->execute([$userid]);
 $userRow = $userRow->fetch();
 
@@ -30,7 +25,7 @@ $myCharId   = $userRow['charid']   ?? null;
 $myCharName = $userRow['charname'] ?? null;
 
 // ── FETCH CURRENT POSITION ────────────────────────────────────────────────────
-$posStmt = $db->prepare("SELECT * FROM user_positions WHERE userid=?");
+$posStmt = $db->prepare("SELECT * FROM Characters WHERE id=?");
 $posStmt->execute([$userid]);
 $pos      = $posStmt->fetch();
 $currentZ = (int)($pos['coord_z'] ?? 0);
@@ -38,64 +33,46 @@ $currentX = (int)($pos['coord_x'] ?? 0);
 $currentY = (int)($pos['coord_y'] ?? 0);
 
 // ── CLOCK ─────────────────────────────────────────────────────────────────────
-$clock      = getClock($db, $userid);
-$timePeriod = getTimePeriod((int)$clock['game_hour']);
+//$clock      = getClock($db, $userid);
+//$timePeriod = getTimePeriod((int)$clock['game_hour']);
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
-function getUserScores(PDO $db, int $id): array {
+function getElementMultipliers(PDO $db, int $id): array {
     $totals = ['ice'=>0,'ground'=>0,'fire'=>0,'water'=>0,'dark'=>0];
-    $s = $db->prepare("SELECT s.iceScore,s.groundScore,s.fireScore,
-        s.waterScore,s.darkScore
-        FROM userAttributes ua JOIN skills s ON s.id=ua.skillid
-        WHERE ua.userid=?");
+    $s = $db->prepare("SELECT e.name, i.itemName, c.charName, sum(inv.quantityOnHand) as QOH, sum(i.elementMultiplier) as mult
+						From Inventory inv
+						left outer join Items i on inv.itemId=i.id
+						left outer join element e on i.elementId = e.id
+						left outer join characters c on inv.userId = c.id
+						where inv.quantityOnHand > 0 and c.id = ? and e.name is not null
+						group by e.name , i.itemName, c.charName");
     $s->execute([$id]);
-    foreach ($s->fetchAll() as $r) {
-        foreach (['ice','ground','fire','water','dark'] as $el)
-            $totals[$el] += $r[$el.'Score'];
-    }
-    $w = $db->prepare("SELECT s.iceScore,s.groundScore,s.fireScore,
-        s.waterScore,s.darkScore
-        FROM inventory i
-        JOIN weaponAttributes wa ON wa.weaponid=i.weaponid
-        JOIN skills s ON s.id=wa.skillid WHERE i.userid=?");
-    $w->execute([$id]);
-    foreach ($w->fetchAll() as $r) {
-        foreach (['ice','ground','fire','water','dark'] as $el)
-            $totals[$el] += $r[$el.'Score'];
-    }
-    $c = $db->prepare("SELECT cs.skill_bonus, c.element
-        FROM user_clothing uc
-        JOIN colour_shades cs ON cs.id=uc.colour_shade_id
-        JOIN colours c ON c.id=cs.colour_id
-        WHERE uc.userid=? AND uc.is_equipped=1 AND cs.skill_bonus>0");
-    $c->execute([$id]);
-    foreach ($c->fetchAll() as $r) {
-        if (isset($totals[$r['element']])) $totals[$r['element']] += $r['skill_bonus'];
-    }
-    return $totals;
-}
+	$result = $s->get_result();
+	$elements = [];
+	$totalMultiplier = 0;
 
-function getCharScores(PDO $db, int $id): array {
-    $totals = ['ice'=>0,'ground'=>0,'fire'=>0,'water'=>0,'dark'=>0];
-    $s = $db->prepare("SELECT s.iceScore,s.groundScore,s.fireScore,
-        s.waterScore,s.darkScore
-        FROM charAttributes ca JOIN skills s ON s.id=ca.skillid
-        WHERE ca.charid=?");
-    $s->execute([$id]);
-    foreach ($s->fetchAll() as $r) {
-        foreach (['ice','ground','fire','water','dark'] as $el)
-            $totals[$el] += $r[$el.'Score'];
-    }
-    $w = $db->prepare("SELECT s.iceScore,s.groundScore,s.fireScore,
-        s.waterScore,s.darkScore
-        FROM charinventory ci
-        JOIN weaponAttributes wa ON wa.weaponid=ci.weaponid
-        JOIN skills s ON s.id=wa.skillid WHERE ci.charid=?");
-    $w->execute([$id]);
-    foreach ($w->fetchAll() as $r) {
-        foreach (['ice','ground','fire','water','dark'] as $el)
-            $totals[$el] += $r[$el.'Score'];
-    }
+	while ($row = $result->fetch_assoc()) {
+
+		$element = $row['name'] ?? 'None'; // items with no element
+
+		if (!isset($elements[$element])) {
+			$elements[$element] = [
+				'totalMultiplier' => 0.00,
+				'items'           => []
+			];
+		}
+
+		$elements[$element]['totalMultiplier'] += (float) $row['mult'];
+		$elements[$element]['items'][]          = [
+			'itemName' => $row['itemName'],
+			'QOH'      => (float) $row['QOH'],
+			'mult'     => (float) $row['mult']
+		];
+	}
+	$s->close();
+	ksort($elements);
+
+	$output = ['elements' => $elements];
     return $totals;
 }
 
@@ -117,102 +94,59 @@ function getTileMultipliers(PDO $db, int $tileTypeId): array {
     $mults->execute([$tileTypeId]);
     return $mults->fetchAll(PDO::FETCH_KEY_PAIR);
 }
-
-function getBowtieCount(PDO $db, int $uid): int {
-    $r = $db->prepare("SELECT COUNT(*) FROM inventory i
-        JOIN weapons w ON w.id=i.weaponid
-        WHERE i.userid=? AND w.name LIKE '%Bowtie%'");
-    $r->execute([$uid]);
-    return (int)$r->fetchColumn();
+function getCurrentOutfit(PDO $db): array{
+	$clothes = $db->prepare("SELECT i.slot, i.itemName
+						From Inventory inv
+						left outer join Items i on inv.itemId=i.id
+						left outer join characters c on inv.userId = c.id
+						where inv.quantityOnHand > 0 and c.id = ?
+						group by i.slot , i.itemName, c.charName");
+	$clothes->execute([$userid]);
+	return $clothes->fetchAll(PDO::FETCH_KEY_PAIR);
 }
+
 
 function addCoins(PDO $db, int $uid, int $amount): void {
-    $db->prepare("INSERT INTO user_coins (userid,coins) VALUES (?,?)
-                  ON DUPLICATE KEY UPDATE coins=coins+?")
-       ->execute([$uid, $amount, $amount]);
+    $db->prepare("insert into inventory (userId, itemId,quantityOnHand) values (?,(select id from items where itemName ='Coins') ,?)")
+       ->execute([$uid, $amount]);
 }
 
-function updateStats(PDO $db, int $uid, array $fields): void {
-    $sets = implode(',', array_map(fn($f) => "$f=$f+1", $fields));
-    $db->prepare("INSERT INTO user_stats (userid) VALUES (?)
-                  ON DUPLICATE KEY UPDATE $sets")
-       ->execute([$uid]);
-}
 
-function findNearestEmpty(PDO $db, int $targetX, int $targetY,
-                          int $targetZ, int $excludeUserId): array {
-    $tiles = $db->query("SELECT coord_x, coord_y FROM map_tiles
-        WHERE coord_z=$targetZ
-        ORDER BY ABS(coord_x-$targetX)+ABS(coord_y-$targetY)")->fetchAll();
-    foreach ($tiles as $t) {
-        $check = $db->prepare("SELECT COUNT(*) FROM user_positions
-            WHERE coord_x=? AND coord_y=? AND coord_z=? AND userid!=?");
-        $check->execute([$t['coord_x'],$t['coord_y'],$targetZ,$excludeUserId]);
-        if ((int)$check->fetchColumn() === 0)
-            return [$t['coord_x'],$t['coord_y']];
-    }
-    return [1,1];
-}
-
-function buildPie(array $data, float $total, int $size=70): string {
-    if (!$data || $total<=0) return '';
-    $cx=$cy=$size/2; $r=$size/2-4; $angle=-90; $paths='';
-    foreach ($data as $seg) {
-        $pct=$seg['quantity']/$total; $sweep=$pct*360;
-        if ($sweep>=360) $sweep=359.99;
-        $x1=$cx+$r*cos(deg2rad($angle));   $y1=$cy+$r*sin(deg2rad($angle));
-        $x2=$cx+$r*cos(deg2rad($angle+$sweep)); $y2=$cy+$r*sin(deg2rad($angle+$sweep));
-        $large=$sweep>180?1:0;
-        $col=htmlspecialchars($seg['hex_base']);
-        $paths.="<path d=\"M{$cx},{$cy} L{$x1},{$y1} A{$r},{$r} 0 {$large},1
-            {$x2},{$y2} Z\" fill=\"{$col}\" stroke=\"#0a0b0f\" stroke-width=\"1\">
-            <title>{$seg['name']}: {$seg['quantity']}</title></path>";
-        $angle+=$sweep;
-    }
-    return "<svg width=\"{$size}\" height=\"{$size}\"
-        viewBox=\"0 0 {$size} {$size}\">{$paths}</svg>";
-}
-
-// ── SLEEP ─────────────────────────────────────────────────────────────────────
-if ($act === 'sleep') {
-    sleepUser($db, $userid);
-    $newClock = getClock($db, $userid);
-    redirect("walk.php",
-        "😴 Slept 8 hours — Day {$newClock['game_day']}, "
-        . getTimeIcon(getTimePeriod($newClock['game_hour']))
-        . " " . ucfirst(getTimePeriod($newClock['game_hour']))
-        . ". Full health restored!");
-}
 
 // ── RANDOMIZE MAP ─────────────────────────────────────────────────────────────
 if ($act === 'randomize') {
     foreach ([-1, 0, 1] as $z) {
         $tilesOnLayer = $db->query("SELECT id FROM map_tiles
             WHERE coord_z=$z")->fetchAll();
-        $diceNumbers  = [2,3,3,4,4,5,5,6,6,8,8,9,9,10,10,11,11,12];
+        $diceNumbers  = [1,2,3,4,5,6,7,8,9,10];
         shuffle($diceNumbers);
-        $i = 0;
+        $x = rand($diceNumbers);
+		$y = rand($diceNumbers);
+		$layer = match((int) $z) {
+			 1 => 'sky',
+			 0 => 'surface',
+			-1 => 'underworld',
+			default => 'unknown'
+		};
+
         foreach ($tilesOnLayer as $tile) {
-            $newType = $db->query("SELECT id FROM tile_types
-                WHERE FIND_IN_SET('$z', allowed_z)>0
-                ORDER BY RAND() LIMIT 1")->fetchColumn();
+            $newType = $db->query("select id from element where allowedLayers like '%$layer%' order by rand() limit 1;")->fetchColumn();
             if ($newType) {
-                $db->prepare("UPDATE map_tiles SET tile_type_id=?, dice_number=?
-                    WHERE id=?")
-                   ->execute([$newType, $diceNumbers[$i%count($diceNumbers)], $tile['id']]);
+                $db->prepare("UPDATE map_tiles SET elementId=? where coordX=? AND coordY=? and coordZ=?")
+                   ->execute([$newType, $x,$y,$z]);
             }
             $i++;
         }
     }
-    redirect("walk.php", "Map randomized across all z layers!");
+    redirect("walk.php", "Map randomized across all tiles!");
 }
 
 // ── ROLL DICE ─────────────────────────────────────────────────────────────────
 $rollData = null;
 
 if ($act === 'roll') {
-    $die1 = rand(1,12); // X
-    $die2 = rand(1,12); // Y
+    $die1 = rand(1,10); // X
+    $die2 = rand(1,10); // Y
     $newX = $die1;
     $newY = $die2;
 
@@ -239,55 +173,9 @@ if ($act === 'roll') {
     }
 
     // Save user position with z
-    $db->prepare("INSERT INTO user_positions (userid,coord_x,coord_y,coord_z)
-                  VALUES (?,?,?,?)
-                  ON DUPLICATE KEY UPDATE coord_x=?,coord_y=?,coord_z=?")
-       ->execute([$userid,$newX,$newY,$currentZ,$newX,$newY,$currentZ]);
+    $db->prepare("UPDATE Character SET CoordX=?,CoordY=?,CoordZ=? WHERE ID=?")
+       ->execute([$newX,$newY,$currentZ,$userId]);
 
-    // Save move trail with z
-    $db->prepare("INSERT INTO user_move_trail
-                  (userid,coord_x,coord_y,coord_z,tile_type_name,tile_icon)
-                  VALUES (?,?,?,?,?,?)")
-       ->execute([$userid,$newX,$newY,$currentZ,
-                  $nearest['type_name']??'',$nearest['icon']??'']);
-
-    // Advance clock
-    $clock      = advanceClock($db,$userid);
-    $timePeriod = getTimePeriod((int)$clock['game_hour']);
-
-    updateStats($db,$userid,['tiles_visited']);
-
-    // Combined tile + layer + time multipliers
-    $tileMults  = $nearest ? getTileMultipliers($db,$nearest['tile_type_id']) : [];
-    $layerMults = getLayerMultipliersByZ($db,$currentZ,$timePeriod);
-    $multipliers = $tileMults;
-    foreach ($layerMults as $el=>$mult) {
-        if (!isset($multipliers[$el]) || $mult>$multipliers[$el])
-            $multipliers[$el] = $mult;
-    }
-
-    // ── MOVE THIS USER'S CHARACTER RANDOMLY ON SAME Z ─────────────────────────
-    $movedChars = [];
-    if ($myCharId) {
-        $allTileCoords = $db->query("SELECT coord_x,coord_y FROM map_tiles
-            WHERE coord_z=$currentZ")->fetchAll();
-        if ($allTileCoords) {
-            $rt = $allTileCoords[array_rand($allTileCoords)];
-            $db->prepare("INSERT INTO character_positions
-                          (charid,coord_x,coord_y,coord_z)
-                          VALUES (?,?,?,?)
-                          ON DUPLICATE KEY UPDATE coord_x=?,coord_y=?,coord_z=?")
-               ->execute([$myCharId,$rt['coord_x'],$rt['coord_y'],$currentZ,
-                          $rt['coord_x'],$rt['coord_y'],$currentZ]);
-            $movedChars[] = [
-                'id'   => $myCharId,
-                'name' => $myCharName,
-                'x'    => $rt['coord_x'],
-                'y'    => $rt['coord_y'],
-                'z'    => $currentZ,
-            ];
-        }
-    }
 
     // ── GATHER FLOWER & SCROLL ────────────────────────────────────────────────
     $flowerGathered   = null;

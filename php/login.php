@@ -1,6 +1,7 @@
 <?php
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 if (!empty($_SESSION['userid'])) {
@@ -10,6 +11,7 @@ if (!empty($_SESSION['userid'])) {
 
 require 'db.php';
 require 'layout.php';
+
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -17,23 +19,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password']      ?? '';
     $db       = getDB();
 
-    $stmt = $db->prepare("SELECT * FROM users WHERE username=?");
+    $stmt = $db->prepare("SELECT * FROM characters WHERE charName=?");
     $stmt->execute([$username]);
     $user = $stmt->fetch();
 
     if ($user && password_verify($password, $user['password_hash'])) {
         $_SESSION['userid']   = $user['id'];
-        $_SESSION['username'] = $user['username'];
-        $_SESSION['name']     = $user['name'];
-        $_SESSION['is_admin'] = (int)$user['is_admin'];
+        $_SESSION['username'] = $user['charName'];
+		if($user['role']=='Admin')
+		{
+			$_SESSION['is_admin']=1;
+		}else {
+			$_SESSION['is_admin']=0;
+		}
         header("Location: walk.php");
         exit();
     } else {
         $error = 'Invalid username or password.';
     }
 }
+
 ?>
-<?php authHeader('Login', 'Enter the world'); ?>
+<?php pageHeader('Login', 'Enter the world'); ?>
 
     <?php if ($error): ?>
       <div class="alert alert-error" style="margin-bottom:1.25rem;">
@@ -81,4 +88,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </a>
     </div>
 
-<?php authFooter(); ?>
+<!--?php authFooter(); ?-->
