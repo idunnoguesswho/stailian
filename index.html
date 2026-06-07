@@ -15,7 +15,7 @@
       <p class="page-sub">An elemental world of exploration, strategy, and crafting</p>
       <p class="landing-copy">
         Stailian now opens through static HTML on GitHub Pages, with the active game
-        screens backed by Firebase in the browser. Roll across the map, build your
+        screens backed by a shared Google Sheet in the browser. Roll across the map, build your
         wardrobe, and track your scorecard without a PHP server.
       </p>
       <div class="landing-actions">
@@ -29,8 +29,8 @@
       <div class="card-title">GitHub Pages Ready</div>
       <p style="color:var(--muted);line-height:1.7;margin-bottom:1rem;">
         PHP files are kept in the repository for reference, but Pages serves the
-        static HTML experience. Server-only features now have HTML placeholders
-        that describe the remaining Firebase conversion work.
+        static HTML experience. Server-only features now read from Google Sheet tabs
+        or queue writes until an Apps Script endpoint is configured.
       </p>
       <div class="btn-row" style="margin-top:0;">
         <a class="btn btn-outline" href="walk.html">Walk</a>
@@ -60,13 +60,5 @@
   </div>
 </main>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="js/firebase-config.js"></script>
-<script>
-  auth.onAuthStateChanged(user => {
-    if (user) window.location.href = 'walk.html';
-  });
-</script>
 </body>
 </html>
