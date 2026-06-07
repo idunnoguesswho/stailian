@@ -17,7 +17,7 @@
 <div class="grid-2">
   <section>
     <div class="card dice-card">
-      <div id="dice-display" class="dice-display">-- --</div>
+      <div id="dice-display" class="dice-display">-- -- --</div>
       <div id="tile-result" class="tile-result"></div>
       <button class="btn btn-primary roll-btn" onclick="doRoll()" id="rollBtn">
         Roll the Dice
@@ -89,7 +89,7 @@ requireSheetUser(user => {
   currentUser = user;
   renderPageHeader("walk.html", user);
   renderPageFooter();
-  mapTiles = SheetDB.mapTilesForZ(currentUser.coordZ || 0);
+  mapTiles = [-1, 0, 1].flatMap(z => SheetDB.mapTilesForZ(z));
   updateStatusDisplay();
   renderCurrentTile();
   renderInventoryPanels();
@@ -110,8 +110,15 @@ function updateStatusDisplay() {
   document.getElementById("layer-display").textContent = layerName(currentUser.coordZ);
 }
 
-function nearestTile(x, y) {
+function layerFromRoll(zRoll) {
+  if (zRoll <= 3) return -1;
+  if (zRoll <= 6) return 0;
+  return 1;
+}
+
+function nearestTile(x, y, z) {
   return mapTiles
+    .filter(tile => toNumber(tile.coordZ) === toNumber(z))
     .slice()
     .sort((a, b) => {
       const da = Math.abs(toNumber(a.coordX) - x) + Math.abs(toNumber(a.coordY) - y);
@@ -181,13 +188,15 @@ async function doRoll() {
   btn.disabled = true;
   btn.textContent = "Rolling...";
 
-  const x = Math.floor(Math.random() * 12) + 1;
-  const y = Math.floor(Math.random() * 12) + 1;
-  document.getElementById("dice-display").textContent = `${x} ${y}`;
+  const x = Math.floor(Math.random() * 10) + 1;
+  const y = Math.floor(Math.random() * 10) + 1;
+  const zRoll = Math.floor(Math.random() * 10) + 1;
+  const z = layerFromRoll(zRoll);
+  document.getElementById("dice-display").textContent = `${x} ${y} ${zRoll}`;
 
-  const tile = nearestTile(x, y);
+  const tile = nearestTile(x, y, z);
   if (!tile) {
-    document.getElementById("tile-result").textContent = "No map tiles found in the Sheet.";
+    document.getElementById("tile-result").textContent = `No map tiles found on ${layerName(z)}.`;
     btn.disabled = false;
     btn.textContent = "Roll the Dice";
     return;
@@ -199,7 +208,7 @@ async function doRoll() {
   const writeResult = result.writeResult;
 
   document.getElementById("tile-result").innerHTML =
-    `Rolled (${x}, ${y}) -> nearest Sheet tile (${tile.coordX}, ${tile.coordY})`;
+    `Rolled (${x}, ${y}, ${zRoll}) -> ${layerName(z)} tile (${tile.coordX}, ${tile.coordY}, ${tile.coordZ})`;
   document.getElementById("outcome-card").classList.remove("is-hidden");
   document.getElementById("outcome-card").innerHTML = `
     <div class="card-title">${escHtml(tile.element?.name || "Tile Result")}</div>
