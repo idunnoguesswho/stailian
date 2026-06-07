@@ -495,15 +495,16 @@ nav a.active { color: var(--gold); border-bottom-color: var(--gold); }
     overflow-x: auto;
   }
   .map-grid {
-    display: inline-flex;
+    display: flex;
     flex-direction: column;
     gap: 4px;
-    min-width: min(100%, 360px);
+    min-width: 520px;
+    width: 100%;
   }
   .map-row {
     display: grid;
     gap: 4px;
-    grid-template-columns: repeat(5, minmax(56px, 1fr));
+    grid-template-columns: repeat(10, minmax(42px, 1fr));
   }
   .map-tile {
     aspect-ratio: 1;
@@ -521,9 +522,13 @@ nav a.active { color: var(--gold); border-bottom-color: var(--gold); }
     text-shadow: 0 1px 2px rgba(0,0,0,.65);
   }
   .map-tile:hover,
-  .map-tile.selected {
+  .map-tile.selected,
+  .map-tile.focused {
     border-color: var(--gold);
     box-shadow: 0 0 0 1px rgba(200,153,58,.35);
+  }
+  .map-tile.focused:not(.selected) {
+    border-color: rgba(216,208,192,.65);
   }
   .map-tile.player::after {
     border: 2px solid var(--text);
@@ -535,12 +540,12 @@ nav a.active { color: var(--gold); border-bottom-color: var(--gold); }
   }
   .map-tile-icon {
     font-family: "Cinzel", serif;
-    font-size: 1.15rem;
+    font-size: 1rem;
     line-height: 1;
   }
   .map-tile-coords {
     font-family: "Cinzel", serif;
-    font-size: .58rem;
+    font-size: .52rem;
     margin-top: .25rem;
   }
   .map-player-dot {
@@ -554,6 +559,45 @@ nav a.active { color: var(--gold); border-bottom-color: var(--gold); }
     padding: 0 .25rem;
     position: absolute;
     transform: translateX(-50%);
+  }
+  .map-layer-summary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    cursor: pointer;
+    display: block;
+    margin-bottom: .55rem;
+    padding: .7rem .8rem;
+    text-align: left;
+    width: 100%;
+  }
+  .map-layer-summary.active {
+    border-color: var(--gold);
+    background: rgba(200,153,58,.08);
+  }
+  .map-layer-summary strong,
+  .map-layer-summary span {
+    display: block;
+    font-family: "Cinzel", serif;
+  }
+  .map-layer-summary strong {
+    color: var(--gold);
+    font-size: .78rem;
+    letter-spacing: .07em;
+  }
+  .map-layer-summary span {
+    color: var(--muted);
+    font-size: .62rem;
+    margin-top: .15rem;
+  }
+  .map-layer-summary em {
+    color: var(--muted);
+    display: block;
+    font-size: .82rem;
+    font-style: normal;
+    line-height: 1.45;
+    margin-top: .35rem;
   }
   .is-hidden { display: none; }
   .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:1.5rem; flex-wrap:wrap; }
