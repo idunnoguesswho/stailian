@@ -476,6 +476,85 @@ nav a.active { color: var(--gold); border-bottom-color: var(--gold); }
     justify-content: center;
     margin-top: .75rem;
   }
+  .map-layout {
+    align-items: start;
+  }
+  .layer-tabs {
+    display: flex;
+    gap: .35rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .map-controls {
+    display: flex;
+    gap: .4rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+  }
+  .map-viewport {
+    overflow-x: auto;
+  }
+  .map-grid {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: min(100%, 360px);
+  }
+  .map-row {
+    display: grid;
+    gap: 4px;
+    grid-template-columns: repeat(5, minmax(56px, 1fr));
+  }
+  .map-tile {
+    aspect-ratio: 1;
+    border: 2px solid rgba(255,255,255,.08);
+    border-radius: var(--radius);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 56px;
+    overflow: hidden;
+    padding: .35rem;
+    position: relative;
+    text-shadow: 0 1px 2px rgba(0,0,0,.65);
+  }
+  .map-tile:hover,
+  .map-tile.selected {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px rgba(200,153,58,.35);
+  }
+  .map-tile.player::after {
+    border: 2px solid var(--text);
+    border-radius: var(--radius);
+    content: "";
+    inset: 3px;
+    pointer-events: none;
+    position: absolute;
+  }
+  .map-tile-icon {
+    font-family: "Cinzel", serif;
+    font-size: 1.15rem;
+    line-height: 1;
+  }
+  .map-tile-coords {
+    font-family: "Cinzel", serif;
+    font-size: .58rem;
+    margin-top: .25rem;
+  }
+  .map-player-dot {
+    background: rgba(10,11,15,.72);
+    border-radius: 999px;
+    bottom: 3px;
+    color: var(--gold);
+    font-family: "Cinzel", serif;
+    font-size: .48rem;
+    left: 50%;
+    padding: 0 .25rem;
+    position: absolute;
+    transform: translateX(-50%);
+  }
   .is-hidden { display: none; }
   .tab-bar { display:flex; gap:0; border-bottom:1px solid var(--border); margin-bottom:1.5rem; flex-wrap:wrap; }
   .tab-btn {

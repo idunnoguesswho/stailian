@@ -9,15 +9,210 @@
 </head>
 <body>
 <div id="page-header"></div>
-<div id="static-page"></div>
+<div id="flash-zone"></div>
+
+<h1 class="page-title">Battle Arena</h1>
+<p class="page-sub">Fight from the Google Sheet data without leaving the static site.</p>
+
+<div class="grid-2">
+  <section>
+    <div class="card">
+      <div class="card-title">Choose Opponent</div>
+      <div class="form-group">
+        <label for="opponent-select">OPPONENT</label>
+        <select id="opponent-select"></select>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runBattle()">Fight</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Your Power</div>
+      <div id="user-power">Loading...</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <div class="card-title">Battle Result</div>
+      <div id="battle-result" class="u-muted">Choose an opponent and fight.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Recent Battles</div>
+      <div id="battle-history">Loading...</div>
+    </div>
+  </section>
+</div>
+
 <div id="page-footer"></div>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="js/firebase-config.js"></script>
-<script src="js/auth.js"></script>
+
+<script src="js/sheet-db.js"></script>
 <script src="js/layout.js"></script>
-<script src="js/static-page.js"></script>
-<script>bootStaticPage();</script>
+<script>
+let currentUser = null;
+
+requireSheetUser(user => {
+  currentUser = user;
+  renderPageHeader("battle.html", user);
+  renderPageFooter();
+  renderOpponents();
+  renderUserPower();
+  renderBattleHistory();
+});
+
+const ELEMENT_KEYS = ["Ice", "Ground", "Fire", "Water", "Dark"];
+
+function emptyScores() {
+  return Object.fromEntries(ELEMENT_KEYS.map(key => [key, 0]));
+}
+
+function addScore(scores, key, amount) {
+  const normalized = String(key || "").toLowerCase();
+  const map = {
+    ice: "Ice",
+    snow: "Ice",
+    mountain: "Ground",
+    forest: "Ground",
+    ground: "Ground",
+    earth: "Ground",
+    fire: "Fire",
+    volcanic: "Fire",
+    lava: "Fire",
+    water: "Water",
+    sea: "Water",
+    lightning: "Water",
+    acid: "Water",
+    dark: "Dark",
+    shadow: "Dark",
+    arcane: "Dark"
+  };
+  const element = map[normalized] || ELEMENT_KEYS.find(name => name.toLowerCase() === normalized);
+  if (element) scores[element] += amount;
+}
+
+function userScores(userId) {
+  const scores = emptyScores();
+  SheetDB.inventoryFor(userId)
+    .filter(row => !/coin/i.test(row.item.itemName || ""))
+    .forEach(row => {
+      addScore(scores, row.element.name, toNumber(row.battleScore));
+    });
+  return scores;
+}
+
+function characterScores(characterId) {
+  const scores = userScores(characterId);
+  SheetDB.characterTraits(characterId).forEach(row => {
+    const label = row.definition.label || "";
+    const value = row.traitValue || "";
+    if (/breath/i.test(label)) addScore(scores, value, 45);
+    if (/origin/i.test(label)) addScore(scores, value, 25);
+    if (/scale/i.test(label)) addScore(scores, value, 15);
+    if (/size/i.test(label)) scores.Fire += { tiny: 5, small: 10, medium: 15, large: 25, colossal: 35 }[String(value).toLowerCase()] || 10;
+  });
+  return scores;
+}
+
+function scoreTotal(scores) {
+  return Object.values(scores).reduce((sum, value) => sum + toNumber(value), 0);
+}
+
+function scoreRows(scores) {
+  return ELEMENT_KEYS.map(key => `
+    <div class="list-row-tight">
+      <span>${escHtml(key)}</span>
+      <strong class="num">${escHtml(scores[key])}</strong>
+    </div>`).join("");
+}
+
+function renderOpponents() {
+  const opponents = SheetDB.table("characters")
+    .filter(character => String(character.id) !== String(currentUser.id))
+    .sort((a, b) => String(a.charName).localeCompare(String(b.charName)));
+  document.getElementById("opponent-select").innerHTML = opponents.map(character => `
+    <option value="${escHtml(character.id)}">${escHtml(character.charName)}${character.role ? " - " + escHtml(character.role) : ""}</option>
+  `).join("");
+}
+
+function renderUserPower() {
+  const scores = userScores(currentUser.id);
+  document.getElementById("user-power").innerHTML = `
+    <div class="score-total">${scoreTotal(scores)}</div>
+    ${scoreRows(scores)}`;
+}
+
+async function runBattle() {
+  const opponentId = document.getElementById("opponent-select").value;
+  const opponent = SheetDB.byId("characters")[String(opponentId)];
+  if (!opponent) return;
+
+  const mine = userScores(currentUser.id);
+  const theirs = characterScores(opponentId);
+  let myWins = 0;
+  let theirWins = 0;
+  let draws = 0;
+  const rows = ELEMENT_KEYS.map(key => {
+    const mineRoll = mine[key] + Math.floor(Math.random() * 10) + 1;
+    const theirRoll = theirs[key] + Math.floor(Math.random() * 10) + 1;
+    const winner = mineRoll > theirRoll ? "user" : theirRoll > mineRoll ? "opponent" : "draw";
+    if (winner === "user") myWins++;
+    else if (winner === "opponent") theirWins++;
+    else draws++;
+    return { key, mineRoll, theirRoll, winner };
+  });
+  const userWon = myWins >= theirWins;
+  const detail = Object.fromEntries(rows.map(row => [row.key, row]));
+  await SheetDB.append("battle_log", {
+    attacker_id: String(currentUser.id),
+    defender_id: String(opponentId),
+    tile_id: "",
+    attacker_roll: scoreTotal(mine),
+    defender_roll: scoreTotal(theirs),
+    winner_id: userWon ? String(currentUser.id) : String(opponentId),
+    battle_detail: JSON.stringify(detail),
+    fought_at: nowIso(),
+    winner_type: userWon ? "user" : "opponent",
+    loser_redirected: 0,
+    loser_new_x: "",
+    loser_new_y: ""
+  });
+
+  document.getElementById("battle-result").innerHTML = `
+    <div class="score-total">${userWon ? "Victory" : "Defeat"}</div>
+    <p class="u-muted">${escHtml(currentUser.name)} ${myWins}W - ${draws}D - ${theirWins}W ${escHtml(opponent.charName)}</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Element</th><th>You</th><th>${escHtml(opponent.charName)}</th><th>Winner</th></tr></thead>
+        <tbody>${rows.map(row => `
+          <tr>
+            <td>${escHtml(row.key)}</td>
+            <td class="num">${escHtml(row.mineRoll)}</td>
+            <td class="num">${escHtml(row.theirRoll)}</td>
+            <td>${row.winner === "user" ? "You" : row.winner === "opponent" ? escHtml(opponent.charName) : "Draw"}</td>
+          </tr>`).join("")}</tbody>
+      </table>
+    </div>`;
+  renderBattleHistory();
+}
+
+function renderBattleHistory() {
+  const rows = SheetDB.table("battle_log")
+    .filter(row => String(row.attacker_id) === String(currentUser.id) || String(row.defender_id) === String(currentUser.id))
+    .slice()
+    .reverse()
+    .slice(0, 8);
+  const names = SheetDB.byId("characters");
+  document.getElementById("battle-history").innerHTML = rows.length ? rows.map(row => {
+    const opponentId = String(row.attacker_id) === String(currentUser.id) ? row.defender_id : row.attacker_id;
+    const opponent = names[String(opponentId)] || {};
+    return `<div class="list-row-tight">
+      <span>${escHtml(opponent.charName || "Unknown")}</span>
+      <span class="u-muted">${escHtml(row.fought_at || row.createdAt || "")}</span>
+    </div>`;
+  }).join("") : `<span class="u-muted">No battles yet.</span>`;
+}
+</script>
 </body>
 </html>

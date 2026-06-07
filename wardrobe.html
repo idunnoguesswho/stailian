@@ -31,6 +31,11 @@
 </div>
 
 <div class="card">
+  <div class="card-title">Health Pack</div>
+  <div id="health-pack-panel">Loading...</div>
+</div>
+
+<div class="card">
   <div class="card-title">Owned Inventory</div>
   <div class="filter-row" id="slot-filters"></div>
   <div class="filter-row" id="element-filters"></div>
@@ -76,6 +81,7 @@ function flash(message) {
 
 function renderAll() {
   renderSummary();
+  renderHealthPack();
   renderFilters();
   renderOwned();
 }
@@ -93,6 +99,24 @@ function renderSummary() {
   document.getElementById("battle-score").innerHTML = `
     <div class="score-total">${score.total}</div>
     <div class="muted">${score.byElement.slice(0, 5).map(row => `${escHtml(row.icon)} ${escHtml(row.element)} ${escHtml(row.score)}`).join(" | ") || "No battle items"}</div>`;
+}
+
+function renderHealthPack() {
+  const coins = SheetDB.inventoryCoins(currentUser.id);
+  const health = Math.min(100, toNumber(currentUser.health, 100));
+  const canBuy = health < 100 && coins >= 1000;
+  document.getElementById("health-pack-panel").innerHTML = `
+    <div class="summary-grid-3">
+      <div><div class="label">HEALTH</div><strong>${health} / 100</strong></div>
+      <div><div class="label">PRICE</div><strong class="num">1000 coins</strong></div>
+      <div><div class="label">COINS</div><strong class="num">${money(coins)}</strong></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="buyHealthPack()" ${canBuy ? "" : "disabled"}>
+        Buy Health Pack
+      </button>
+      <span class="u-muted auth-note">${health >= 100 ? "Health is already full." : canBuy ? "Restores health to 100 immediately." : "Not enough coins."}</span>
+    </div>`;
 }
 
 function renderFilters() {
@@ -166,6 +190,19 @@ async function sellOne(itemId) {
 async function sellAllFiltered() {
   const result = await SheetDB.sellAll(currentUser.id, activeSlot);
   flash(`Sold not-wearing ${activeSlot === "All" ? "items" : activeSlot + " items"} for ${result.totalGold || 0} coins.`);
+  currentUser = SheetDB.getCurrentCharacter() || currentUser;
+  renderAll();
+}
+
+async function buyHealthPack() {
+  const result = await SheetDB.buyHealthPack(currentUser.id);
+  if (!result.ok) {
+    document.getElementById("flash-zone").innerHTML = `<div class="alert alert-error">${escHtml(result.error)}</div>`;
+    renderAll();
+    return;
+  }
+  currentUser = result.user || SheetDB.getCurrentCharacter() || currentUser;
+  flash("Health restored to 100. No health pack item was added to inventory.");
   renderAll();
 }
 

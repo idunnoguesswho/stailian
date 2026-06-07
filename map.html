@@ -3,21 +3,200 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Map Admin - Stailian</title>
+<title>World Map - Stailian</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;900&family=Crimson+Pro:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="stailian.css">
 </head>
 <body>
 <div id="page-header"></div>
-<div id="static-page"></div>
+
+<h1 class="page-title">World Map</h1>
+<p class="page-sub">Graphical view of the 10x10 map across Sky, Surface, and Underworld.</p>
+
+<div class="grid-2 map-layout">
+  <section>
+    <div class="card">
+      <div class="card-title">Layer</div>
+      <div class="layer-tabs">
+        <button class="tab-btn" data-layer="1" onclick="setLayer(1)">Sky</button>
+        <button class="tab-btn" data-layer="0" onclick="setLayer(0)">Surface</button>
+        <button class="tab-btn" data-layer="-1" onclick="setLayer(-1)">Underworld</button>
+      </div>
+      <div class="map-controls">
+        <button class="btn btn-outline btn-sm" onclick="moveView(0,-1)">Up</button>
+        <button class="btn btn-outline btn-sm" onclick="moveView(-1,0)">Left</button>
+        <button class="btn btn-outline btn-sm" onclick="moveView(1,0)">Right</button>
+        <button class="btn btn-outline btn-sm" onclick="moveView(0,1)">Down</button>
+        <button class="btn btn-outline btn-sm" onclick="centerOnPlayer()">Player</button>
+      </div>
+      <div class="map-viewport">
+        <div id="map-grid" class="map-grid"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <div class="card-title">Tile Details</div>
+      <div id="tile-detail">Loading...</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Visible Elements</div>
+      <div id="element-key">Loading...</div>
+    </div>
+  </section>
+</div>
+
 <div id="page-footer"></div>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-<script src="js/firebase-config.js"></script>
-<script src="js/auth.js"></script>
+
+<script src="js/sheet-db.js"></script>
 <script src="js/layout.js"></script>
-<script src="js/static-page.js"></script>
-<script>bootStaticPage();</script>
+<script>
+let currentUser = null;
+let activeLayer = 0;
+let selectedX = 1;
+let selectedY = 1;
+let viewX = 1;
+let viewY = 1;
+
+requireSheetUser(user => {
+  currentUser = user;
+  activeLayer = Math.max(-1, Math.min(1, toNumber(user.coordZ)));
+  selectedX = Math.max(1, Math.min(10, toNumber(user.position_x, 1)));
+  selectedY = Math.max(1, Math.min(10, toNumber(user.position_y, 1)));
+  viewX = selectedX;
+  viewY = selectedY;
+  renderPageHeader("map.html", user);
+  renderPageFooter();
+  renderMap();
+});
+
+function layerName(z) {
+  if (toNumber(z) === 1) return "Sky";
+  if (toNumber(z) === -1) return "Underworld";
+  return "Surface";
+}
+
+function elementClass(name) {
+  const key = normText(name).replace(/[^a-z0-9]+/g, "-");
+  return `map-element-${key}`;
+}
+
+function tileColor(elementName) {
+  const colors = {
+    forest: "#2f7d46",
+    hills: "#8b7355",
+    fields: "#b9a84a",
+    pasture: "#7aa45d",
+    mountains: "#8fa5b8",
+    desert: "#c78a38",
+    river: "#2f86bd",
+    swamp: "#3e6b50",
+    volcano: "#bb3f2d",
+    tundra: "#96d7df",
+    savanna: "#b99a45",
+    storm: "#7867c9",
+    lava: "#d94e24"
+  };
+  return colors[normText(elementName)] || "#4d5368";
+}
+
+function visibleRange(start) {
+  const min = Math.max(1, Math.min(6, start - 2));
+  return Array.from({ length: 5 }, (_, i) => min + i);
+}
+
+function setLayer(z) {
+  activeLayer = toNumber(z);
+  renderMap();
+}
+
+function moveView(dx, dy) {
+  viewX = Math.max(1, Math.min(10, viewX + dx));
+  viewY = Math.max(1, Math.min(10, viewY + dy));
+  selectedX = viewX;
+  selectedY = viewY;
+  renderMap();
+}
+
+function centerOnPlayer() {
+  activeLayer = Math.max(-1, Math.min(1, toNumber(currentUser.coordZ)));
+  selectedX = Math.max(1, Math.min(10, toNumber(currentUser.position_x, 1)));
+  selectedY = Math.max(1, Math.min(10, toNumber(currentUser.position_y, 1)));
+  viewX = selectedX;
+  viewY = selectedY;
+  renderMap();
+}
+
+function selectTile(x, y) {
+  selectedX = x;
+  selectedY = y;
+  viewX = x;
+  viewY = y;
+  renderMap();
+}
+
+function renderMap() {
+  document.querySelectorAll("[data-layer]").forEach(button => {
+    button.classList.toggle("active", toNumber(button.dataset.layer) === activeLayer);
+  });
+  const tiles = SheetDB.mapTilesForZ(activeLayer);
+  const byCoord = Object.fromEntries(tiles.map(tile => [`${tile.coordX}:${tile.coordY}`, tile]));
+  const xs = visibleRange(viewX);
+  const ys = visibleRange(viewY);
+  document.getElementById("map-grid").innerHTML = ys.map(y => `
+    <div class="map-row">
+      ${xs.map(x => {
+        const tile = byCoord[`${x}:${y}`];
+        const element = tile?.element || {};
+        const isPlayer = activeLayer === toNumber(currentUser.coordZ) &&
+          x === toNumber(currentUser.position_x) &&
+          y === toNumber(currentUser.position_y);
+        const isSelected = x === selectedX && y === selectedY;
+        const isTower = x === 5 && y === 5;
+        return `<button class="map-tile ${isSelected ? "selected" : ""} ${isPlayer ? "player" : ""}"
+          style="background:${tileColor(element.name)}"
+          onclick="selectTile(${x},${y})"
+          title="${escHtml(element.name || "Unknown")} (${x}, ${y}, ${activeLayer})">
+          <span class="map-tile-icon">${escHtml(isTower ? "T" : element.icon || "?")}</span>
+          <span class="map-tile-coords">${x},${y}</span>
+          ${isPlayer ? `<span class="map-player-dot">You</span>` : ""}
+        </button>`;
+      }).join("")}
+    </div>`).join("");
+  renderTileDetail(byCoord[`${selectedX}:${selectedY}`]);
+  renderElementKey(tiles);
+}
+
+function renderTileDetail(tile) {
+  if (!tile) {
+    document.getElementById("tile-detail").innerHTML = `<span class="u-muted">Select a tile.</span>`;
+    return;
+  }
+  const element = tile.element || {};
+  document.getElementById("tile-detail").innerHTML = `
+    <div class="tile-heading"><strong>${escHtml(element.icon || "")} ${escHtml(element.name || "Unknown")}</strong></div>
+    <div class="tile-meta">(${escHtml(tile.coordX)}, ${escHtml(tile.coordY)}, z=${escHtml(tile.coordZ)}) - ${escHtml(layerName(tile.coordZ))}</div>
+    <p class="tile-description">${escHtml(element.description || "")}</p>
+    <div class="list-row-tight"><span>Resource</span><strong class="num">${escHtml(element.resource || "none")}</strong></div>
+    <div class="list-row-tight"><span>Layer Source</span><strong class="num">${tile.generated ? "generated" : "sheet"}</strong></div>`;
+}
+
+function renderElementKey(tiles) {
+  const seen = new Map();
+  tiles.forEach(tile => {
+    const name = tile.element?.name || "Unknown";
+    if (!seen.has(name)) seen.set(name, tile.element || {});
+  });
+  document.getElementById("element-key").innerHTML = Array.from(seen.values())
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+    .map(element => `
+      <div class="list-row-tight">
+        <span>${escHtml(element.icon || "")} ${escHtml(element.name || "Unknown")}</span>
+        <span class="u-muted">${escHtml(element.resource || "")}</span>
+      </div>`).join("");
+}
+</script>
 </body>
 </html>

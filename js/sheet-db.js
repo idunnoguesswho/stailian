@@ -21,6 +21,7 @@ const SHEET_TABLES = [
 const INVENTORY_OVERLAY_KEY = "stailian_sheet_inventory_overlay";
 const LOCAL_ROLLS_KEY = "stailian_local_rolls";
 const WRITE_QUEUE_KEY = "stailian_sheet_write_queue";
+const MAP_LAYER_SEED = 417;
 
 function escHtml(str) {
   return String(str ?? "")
@@ -54,6 +55,11 @@ function canonicalId(value) {
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function seededIndex(seed) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
 }
 
 const SheetDB = {
@@ -250,7 +256,7 @@ const SheetDB = {
       email: character.email,
       role: character.role,
       coins: toNumber(state.coins, this.inventoryCoins(character.id)),
-      health: toNumber(state.health, character.CurrentHealth || 100),
+      health: toNumber(state.health, toNumber(character.CurrentHealth, 100)),
       max_health: 100,
       position_x: toNumber(state.coordX, character.coordX),
       position_y: toNumber(state.coordY, character.coordY),
@@ -263,6 +269,17 @@ const SheetDB = {
     return this.byId("element");
   },
 
+  elementsForLayer(z) {
+    const layer = toNumber(z) === 1 ? "sky" : toNumber(z) === -1 ? "underworld" : "surface";
+    const allowed = this.table("element").filter(element =>
+      String(element.allowedLayers || "")
+        .split(",")
+        .map(part => normText(part))
+        .includes(layer)
+    );
+    return allowed.length ? allowed : this.table("element");
+  },
+
   slotsByName() {
     return Object.fromEntries(this.table("slots").map(row => [normText(row.slot_name), row]));
   },
@@ -270,6 +287,18 @@ const SheetDB = {
   itemByName(name) {
     const wanted = normText(name);
     return this.table("items").find(item => normText(item.itemName) === wanted) || null;
+  },
+
+  itemForDrop(elementId, slotName) {
+    const slot = normText(slotName);
+    const activeItems = this.table("items").filter(item =>
+      toNumber(item.isActive, 1) === 1 &&
+      normText(item.slot) === slot
+    );
+    return activeItems.find(item => canonicalId(item.elementId) === canonicalId(elementId)) ||
+      activeItems.find(item => toNumber(item.elementId) === 0) ||
+      activeItems[0] ||
+      null;
   },
 
   itemDisplayName(row) {
@@ -356,6 +385,10 @@ const SheetDB = {
     return coin ? toNumber(coin.quantityOnHand) : 0;
   },
 
+  coinItem() {
+    return this.table("items").find(item => /coin/i.test(item.itemName || "")) || null;
+  },
+
   inventoryValue(userId) {
     const rows = this.inventoryFor(userId);
     const itemValue = rows
@@ -402,19 +435,50 @@ const SheetDB = {
 
   mapTilesForZ(z) {
     const elements = this.byId("element");
-    return this.table("map_tiles")
+    const rows = this.table("map_tiles")
       .filter(row => toNumber(row.coordZ) === toNumber(z))
       .map(row => ({ ...row, element: elements[canonicalId(row.elementId)] || {} }));
+    return this.completeLayerTiles(rows, z);
+  },
+
+  completeLayerTiles(rows, z) {
+    const byCoord = new Map(rows.map(row => [`${toNumber(row.coordX)}:${toNumber(row.coordY)}`, row]));
+    const layerElements = this.elementsForLayer(z);
+    const completed = [];
+    for (let y = 1; y <= 10; y++) {
+      for (let x = 1; x <= 10; x++) {
+        const key = `${x}:${y}`;
+        const existing = byCoord.get(key);
+        if (existing) {
+          const existingElement = existing.element || this.elementsById()[canonicalId(existing.elementId)] || {};
+          const allowed = this.elementsForLayer(z).some(element => canonicalId(element.id) === canonicalId(existingElement.id));
+          if (allowed || toNumber(z) === 0) {
+            completed.push({ ...existing, coordX: x, coordY: y, coordZ: toNumber(z), element: existingElement });
+            continue;
+          }
+        }
+        const elementIndex = Math.floor(seededIndex((x * 101) + (y * 503) + (toNumber(z) * 997) + MAP_LAYER_SEED) * layerElements.length);
+        const element = layerElements[elementIndex] || {};
+        completed.push({
+          id: `generated-${z}-${x}-${y}`,
+          elementId: element.id || "",
+          coordX: x,
+          coordY: y,
+          coordZ: toNumber(z),
+          generated: true,
+          element
+        });
+      }
+    }
+    return completed;
   },
 
   currentTileFor(user) {
-    const elements = this.elementsById();
-    const tile = this.table("map_tiles").find(row =>
+    const tile = this.mapTilesForZ(user.coordZ).find(row =>
       toNumber(row.coordX) === toNumber(user.position_x ?? user.coordX) &&
-      toNumber(row.coordY) === toNumber(user.position_y ?? user.coordY) &&
-      toNumber(row.coordZ) === toNumber(user.coordZ)
+      toNumber(row.coordY) === toNumber(user.position_y ?? user.coordY)
     );
-    return tile ? { ...tile, element: elements[canonicalId(tile.elementId)] || {} } : null;
+    return tile || null;
   },
 
   recentRolls(userId, limit = 8) {
@@ -430,6 +494,10 @@ const SheetDB = {
   async addInventoryItemByName(userId, itemName, quantity = 1, wearing = 0) {
     const item = this.itemByName(itemName);
     if (!item) return { found: false, itemName };
+    return this.addInventoryItem(userId, item, quantity, wearing);
+  },
+
+  async addInventoryItem(userId, item, quantity = 1, wearing = 0) {
     const current = this.inventoryFor(userId).find(row => canonicalId(row.itemId) === canonicalId(item.id));
     const nextQty = toNumber(current?.quantityOnHand) + toNumber(quantity, 1);
     const nextWearing = current ? toNumber(current.wearing) : toNumber(wearing);
@@ -449,6 +517,84 @@ const SheetDB = {
       }
     });
     return { found: true, item, quantityOnHand: nextQty };
+  },
+
+  async setCharacterHealth(userId, health, extra = {}) {
+    const nextHealth = Math.max(0, Math.min(100, toNumber(health)));
+    const placedAt = extra.placedAt || nowIso();
+    this.setLocalState(userId, { health: nextHealth, ...extra, placedAt });
+    await this.write({
+      op: "update",
+      table: "characters",
+      key: { id: String(userId) },
+      row: { id: String(userId), CurrentHealth: nextHealth, placedAt, ...extra }
+    });
+    return nextHealth;
+  },
+
+  rollCountFor(userId) {
+    const local = JSON.parse(localStorage.getItem(LOCAL_ROLLS_KEY) || "[]")
+      .filter(row => String(row.userid) === String(userId));
+    const sheetRows = this.table("rolldata").filter(row => String(row.userid) === String(userId));
+    return local.length ? local.length : sheetRows.length;
+  },
+
+  async autoSellUnlinkedInventory(userId) {
+    const rows = this.inventoryFor(userId).filter(row => row.item?.missingItem);
+    if (!rows.length) return { sold: 0, totalGold: 0 };
+    let totalGold = 0;
+    const updates = [];
+    const coinItem = this.coinItem();
+    rows.forEach(row => {
+      totalGold += toNumber(row.baseValue);
+      this.setInventoryLocal(userId, row.itemId, { quantityOnHand: 0, wearing: 0 });
+      updates.push({
+        userId: String(userId),
+        itemId: String(row.itemId),
+        quantityOnHand: 0,
+        wearing: 0
+      });
+    });
+    if (coinItem && totalGold > 0) {
+      const coinRow = this.inventoryFor(userId).find(inv => canonicalId(inv.itemId) === canonicalId(coinItem.id));
+      const nextCoins = toNumber(coinRow?.quantityOnHand) + totalGold;
+      this.setInventoryLocal(userId, coinItem.id, { quantityOnHand: nextCoins, wearing: 0 });
+      updates.push({
+        userId: String(userId),
+        itemId: String(coinItem.id),
+        quantityOnHand: nextCoins,
+        wearing: 0
+      });
+    }
+    await this.write({ op: "batchUpsert", table: "inventory", rows: updates, keyFields: ["userId", "itemId"] });
+    return { sold: rows.length, totalGold };
+  },
+
+  async buyHealthPack(userId) {
+    const user = this.getCurrentCharacter();
+    if (!user) return { ok: false, error: "No active character." };
+    if (toNumber(user.health) >= 100) return { ok: false, error: "Health is already full." };
+    const coinItem = this.coinItem();
+    if (!coinItem) return { ok: false, error: "Coin item is missing from the Sheet." };
+    const coinRow = this.inventoryFor(userId).find(inv => canonicalId(inv.itemId) === canonicalId(coinItem.id));
+    const coins = toNumber(coinRow?.quantityOnHand);
+    if (coins < 1000) return { ok: false, error: "You need 1000 coins for a health pack." };
+
+    const nextCoins = coins - 1000;
+    this.setInventoryLocal(userId, coinItem.id, { quantityOnHand: nextCoins, wearing: 0 });
+    await this.write({
+      op: "upsert",
+      table: "inventory",
+      key: { userId: String(userId), itemId: String(coinItem.id) },
+      row: {
+        userId: String(userId),
+        itemId: String(coinItem.id),
+        quantityOnHand: nextCoins,
+        wearing: 0
+      }
+    });
+    await this.setCharacterHealth(userId, 100);
+    return { ok: true, user: this.getCurrentCharacter(), coins: nextCoins, health: 100 };
   },
 
   async setWearing(userId, itemId, shouldWear) {
@@ -591,15 +737,14 @@ const SheetDB = {
 
   async rollCharacter(userId, coordX, coordY, coordZ) {
     const user = this.getCurrentCharacter();
-    const tile = this.table("map_tiles").find(row =>
+    const tile = this.mapTilesForZ(coordZ).find(row =>
       toNumber(row.coordX) === toNumber(coordX) &&
-      toNumber(row.coordY) === toNumber(coordY) &&
-      toNumber(row.coordZ) === toNumber(coordZ)
+      toNumber(row.coordY) === toNumber(coordY)
     );
-    const element = tile ? (this.elementsById()[canonicalId(tile.elementId)] || {}) : {};
+    const element = tile?.element || (this.elementsById()[canonicalId(tile?.elementId)] || {});
     const elementName = element.name || "";
     const drops = ["scroll", "flower", "dye", "flower", "flower", "flower", "flower", "flower", "scroll", "scroll"];
-    const clothes = ["shirt", "socks", "pants", "shirt", "socks", "pants", "shirt", "socks", "pants", "bowtie"];
+    const clothes = ["Shirt", "Socks", "Pants", "Shirt", "Socks", "Pants", "Shirt", "Socks", "Pants", "Bowtie"];
     const rewards = [];
 
     if (elementName) {
@@ -607,17 +752,36 @@ const SheetDB = {
       const drop = await this.addInventoryItemByName(userId, dropName, 1, 0);
       if (drop.found) rewards.push(dropName);
     }
-    if (toNumber(coordX) === toNumber(coordY) && elementName) {
-      const clothingName = `${elementName} ${clothes[Math.floor(Math.random() * clothes.length)]}`;
-      const clothing = await this.addInventoryItemByName(userId, clothingName, 1, 0);
-      if (clothing.found) rewards.push(clothingName);
+    const shouldDropClothing = toNumber(coordX) === toNumber(coordY) || Math.random() < 0.3;
+    if (shouldDropClothing && elementName) {
+      const slotName = clothes[Math.floor(Math.random() * clothes.length)];
+      const clothingItem = this.itemForDrop(element.id, slotName);
+      if (clothingItem) {
+        const clothing = await this.addInventoryItem(userId, clothingItem, 1, 0);
+        if (clothing.found) rewards.push(clothingItem.itemName);
+      }
     }
+
+    const placedAt = nowIso();
+    const totalRolls = this.rollCountFor(userId) + 1;
+    const state = this.getLocalState(userId);
+    const hasHealCounter = Object.prototype.hasOwnProperty.call(state, "lastHealedRollCount");
+    const lastHealedAt = hasHealCounter
+      ? toNumber(state.lastHealedRollCount, 0)
+      : Math.floor((totalRolls - 1) / 10) * 10;
+    const healSteps = Math.floor((totalRolls - lastHealedAt) / 10);
+    const healthBefore = Math.min(100, toNumber(user.health, 100));
+    const nextHealth = Math.min(100, healthBefore + Math.max(0, healSteps));
+    const healed = nextHealth - healthBefore;
+    const nextHealedAt = healed > 0 ? lastHealedAt + (healSteps * 10) : lastHealedAt;
 
     this.setLocalState(userId, {
       coordX: toNumber(coordX),
       coordY: toNumber(coordY),
       coordZ: toNumber(coordZ),
-      placedAt: nowIso()
+      health: nextHealth,
+      lastHealedRollCount: nextHealedAt,
+      placedAt
     });
 
     await this.write({
@@ -629,9 +793,11 @@ const SheetDB = {
         coordX: toNumber(coordX),
         coordY: toNumber(coordY),
         coordZ: toNumber(coordZ),
-        placedAt: nowIso()
+        CurrentHealth: nextHealth,
+        placedAt
       }
     });
+    if (healed > 0) rewards.push(`+${healed} health`);
 
     const roll = {
       x: toNumber(coordX),
@@ -639,7 +805,7 @@ const SheetDB = {
       z: toNumber(coordZ),
       userid: String(userId),
       rewards: rewards.join(", "),
-      rollTimeStamp: nowIso()
+      rollTimeStamp: placedAt
     };
     const local = JSON.parse(localStorage.getItem(LOCAL_ROLLS_KEY) || "[]");
     local.push(roll);
@@ -649,6 +815,7 @@ const SheetDB = {
       user: this.getCurrentCharacter() || user,
       tile: tile ? { ...tile, element } : null,
       rewards,
+      healed,
       writeResult
     };
   }
@@ -661,7 +828,8 @@ async function requireSheetUser(callback) {
     window.location.href = "login.html";
     return;
   }
-  callback(user);
+  await SheetDB.autoSellUnlinkedInventory(user.id);
+  callback(SheetDB.getCurrentCharacter() || user);
 }
 
 function logout() {
